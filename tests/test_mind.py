@@ -1,5 +1,5 @@
 import unittest
-from stub import stub
+from mind import mind
 
 
 class TestStub(unittest.TestCase):
@@ -9,7 +9,7 @@ class TestStub(unittest.TestCase):
         input = ["--name", "Davo"]
 
         # When
-        result = stub.setup(input)
+        result = mind.setup(input)
 
         # Then
         self.assertFalse(result.verbose)
@@ -17,14 +17,14 @@ class TestStub(unittest.TestCase):
 
     def test_no_name(self):
         # When
-        result = stub.run()
+        result = mind.run()
 
         # Then
         self.assertEqual(result, "Hello, world!")
 
     def test_name(self):
         # When
-        result = stub.run("Davo")
+        result = mind.run("Davo")
 
         # Then
         self.assertEqual(result, "Hello, Davo!")

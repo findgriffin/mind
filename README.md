@@ -40,7 +40,7 @@ mind
  > 1. [30s ago...] -> #shopping carrots and celery
  > 2. [38s ago...] -> Bring the washing in when I get home!
 
-mind done 2
+mind tick 2
  > Awesome! Archiving "Bring the washing in when I get home!"
 ```
 
@@ -55,6 +55,7 @@ make me look at all the tasks I never completed from 3 years ago!
 
 ## Implementation
 * SQLite as storage format.
+* Try to keep it to one Python file?
 * Markdown support?
 * Python script initially.
 * Web interface (eventually).

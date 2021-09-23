@@ -12,4 +12,4 @@ if __name__ == "__main__":
         logging.info("Verbose logging enabled.")
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
-    print(mind.run(args.name))
+    print(args)

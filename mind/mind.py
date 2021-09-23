@@ -14,13 +14,18 @@ ADD = "StuffToAdd"
 DEFAULT_PATH = Path("~/.mind.db").expanduser()
 STATE = "state"
 STUFF = "stuff"
+TAG = "tag"
+TAGS = "tags"
 TEXT = "TEXT"
 INTEGER = "INTEGER"
 NOT_NULL = "NOT NULL"
 PRIMARY_KEY = "PRIMARY KEY"
 TABLES: dict[str, tuple[tuple[str, ...], ...]] = {
     STUFF: ((ID, TEXT, NOT_NULL, PRIMARY_KEY), (BODY, TEXT, NOT_NULL),
-            (STATE, INTEGER, NOT_NULL))
+            (STATE, INTEGER, NOT_NULL)),
+    # Using ID=stuff.ID here means you can get the most recently used tags
+    # easily.
+    TAGS: ((ID, TEXT, NOT_NULL), (TAG, TEXT, NOT_NULL))
 }
 
 

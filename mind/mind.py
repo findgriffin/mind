@@ -13,7 +13,20 @@ BODY = "body"
 ADD = "StuffToAdd"
 DEFAULT_PATH = Path("~/.mind.db").expanduser()
 STATE = "state"
-TABLE = "stuff"
+STUFF = "stuff"
+TEXT = "TEXT"
+INTEGER = "INTEGER"
+NOT_NULL = "NOT NULL"
+PRIMARY_KEY = "PRIMARY KEY"
+TABLES: dict[str, tuple[tuple[str, ...], ...]] = {
+    STUFF: ((ID, TEXT, NOT_NULL, PRIMARY_KEY), (BODY, TEXT, NOT_NULL),
+            (STATE, INTEGER, NOT_NULL))
+}
+
+
+def create_cmd(name: str, schema: tuple[tuple[str, ...], ...]) -> str:
+    columns = ", ".join([" ".join(column) for column in schema])
+    return f"CREATE TABLE {name}({columns})"
 
 
 class State(Enum):
@@ -46,7 +59,7 @@ def setup(argv) -> argparse.Namespace:
 
 
 def query_active(con: Connection, num: Optional[int] = None) -> list[tuple]:
-    cmd = f"SELECT * FROM {TABLE} WHERE state=0 ORDER BY {ID} DESC"
+    cmd = f"SELECT * FROM {STUFF} WHERE state=0 ORDER BY {ID} DESC"
     if num:
         cmd += f" LIMIT 1 OFFSET {num-1}"
     with con:
@@ -70,17 +83,15 @@ def get_db(path: Path = DEFAULT_PATH):
     else:
         logging.debug("Creating new, empty DB.")
         with sqlite3.connect(path) as con:
-            con.execute(f"CREATE TABLE {TABLE}"
-                        f"({ID} TEXT PRIMARY KEY,"
-                        f"{BODY} TEXT NOT NULL,"
-                        f"{STATE} INTEGER NOT NULL)")
+            for name, schema in TABLES.items():
+                con.execute(create_cmd(name, schema=schema))
             return con
 
 
 def update_state(con, num: int, new_state: State):
     active = query_active(con, num)
     id = active[0][0]
-    update = f"UPDATE {TABLE} SET {STATE}={new_state.value} WHERE id=?"
+    update = f"UPDATE {STUFF} SET {STATE}={new_state.value} WHERE id=?"
     logging.debug(f"Executing.. {update}, id={id}")
     with con:
         con.execute(update, [id])
@@ -97,7 +108,7 @@ def create_row(stuff: list[str]) -> tuple[str, str]:
 def add(con: Connection, stuff: list[str]) -> str:
     row = create_row(stuff)
     with con:
-        con.execute(f"INSERT INTO {TABLE} VALUES (?, ?, 0)", row)
+        con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, 0)", row)
     return row[0]
 
 

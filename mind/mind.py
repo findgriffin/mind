@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 import argparse
@@ -10,7 +11,14 @@ ID = "id"
 BODY = "body"
 ADD = "StuffToAdd"
 DEFAULT_PATH = Path("~/.mind.db").expanduser()
+STATE = "state"
 TABLE = "stuff"
+
+
+class State(Enum):
+    ACTIVE = 0
+    TICKED = 1
+    FORGOTTEN = 2
 
 
 def setup(argv) -> argparse.Namespace:
@@ -42,7 +50,7 @@ def setup(argv) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def ls(con, filters: Optional[list[str]] = None):
+def display(con, filters: Optional[list[str]] = None):
     print("Currently minding...")
     with con:
         cur = con.execute(f"SELECT * FROM {TABLE} ORDER BY {ID} DESC")
@@ -60,16 +68,18 @@ def get_db(path: Path = DEFAULT_PATH):
     else:
         logging.debug("Creating new, empty DB.")
         with sqlite3.connect(path) as con:
-            id_field = f"{ID} TEXT PRIMARY KEY"
-            body_field = f"{BODY} TEXT NOT NULL"
-            con.execute(f"CREATE TABLE {TABLE}({id_field}, {body_field})")
-        return con
+            con.execute(f"CREATE TABLE {TABLE}"
+                        f"({ID} TEXT PRIMARY KEY,"
+                        f"{BODY} TEXT NOT NULL,"
+                        f"{STATE} INTEGER NOT NULL)")
+            return con
 
 
-def write_db(db: list[str], path: Path = DEFAULT_PATH):
-    logging.debug(f"Writing DB with {len(db)} entries to {path}")
-    with open(path, "w") as output:
-        output.writelines(db)
+def update_state(con, num: int, new_state: State):
+    with con:
+        con.execute(
+            f"UPDATE {TABLE} SET {STATE}={new_state}"
+            f"ORDER BY ID DESC LIMIT 1 OFFSET {num}")
 
 
 def create_row(stuff: list[str]) -> tuple[str, str]:
@@ -84,8 +94,8 @@ def run(args: argparse.Namespace) -> None:
     if ADD in args:
         with get_db() as con:
             row = create_row(args.StuffToAdd)
-            con.execute(f"INSERT INTO {TABLE} VALUES (?, ?)", row)
+            con.execute(f"INSERT INTO {TABLE} VALUES (?, ?, 0)", row)
         con.close()
     else:
         with get_db() as con:
-            ls(con)
+            display(con)

@@ -4,6 +4,7 @@ from time import sleep
 import unittest
 
 from mind import mind
+
 fromiso = datetime.fromisoformat
 
 
@@ -20,12 +21,13 @@ class TestSQLite(unittest.TestCase):
             self.assertEqual(cur.fetchone()[-1],
                              "CREATE TABLE stuff(id TEXT PRIMARY KEY,"
                              "body TEXT NOT NULL,state INTEGER NOT NULL)")
+        con.close()
 
     def test_add_and_query(self):
         # Given
         with mind.get_db(self.MEM) as con:
             mind.add(con, ["one", "two", "three"])
-            fetched = mind.query(con)
+            fetched = mind.query_active(con)
             # Then
             self.assertEqual(fetched[0][1], "one two three")
             now = datetime.utcnow()
@@ -35,6 +37,7 @@ class TestSQLite(unittest.TestCase):
             #  > datetime.isoformat()
             # This is good for testing, it makes it a strict test!
             self.assertGreater(now, fromiso(fetched[0][0]))
+        con.close()
 
     def test_add_many_and_query(self):
         with mind.get_db(self.MEM) as con:
@@ -42,7 +45,20 @@ class TestSQLite(unittest.TestCase):
                 sleep(0.03)
                 mind.add(con, f"entry {i}")
             # Then
-            fetched = mind.query(con)
+            fetched = mind.query_active(con)
             self.assertEqual(11, len(fetched))
             self.assertGreater(fromiso(fetched[0][0]),
                                fromiso(fetched[-1][0]))
+        con.close()
+
+    def test_update_no_entries(self):
+        with mind.get_db(self.MEM) as con:
+            mind.add(con, ["some stuff!!"])
+            mind.add(con, ["some more stuff!!"])
+            active_before = mind.query_active(con)
+            self.assertEqual(2, len(active_before))
+            mind.update_state(con, 1, mind.State.TICKED)
+            active_after = mind.query_active(con)
+            self.assertEqual(1, len(active_after))
+            self.assertNotIn("more", active_after[0][1])
+        con.close()

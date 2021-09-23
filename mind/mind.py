@@ -45,15 +45,18 @@ def setup(argv) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def query(con: Connection) -> list[tuple]:
+def query_active(con: Connection, num: Optional[int] = None) -> list[tuple]:
+    cmd = f"SELECT * FROM {TABLE} WHERE state=0 ORDER BY {ID} DESC"
+    if num:
+        cmd += f" LIMIT 1 OFFSET {num-1}"
     with con:
-        cur = con.execute(f"SELECT * FROM {TABLE} ORDER BY {ID} DESC")
+        cur = con.execute(cmd)
         return cur.fetchmany(size=11)
 
 
 def display(con, filters: Optional[list[str]] = None):
     print("Currently minding...")
-    fetched = query(con)
+    fetched = query_active(con)
     for index, row in enumerate(fetched[:10], 1):
         print(f" {index}. {row[0]} -> {row[1]}")
     if len(fetched) > 10:
@@ -75,10 +78,12 @@ def get_db(path: Path = DEFAULT_PATH):
 
 
 def update_state(con, num: int, new_state: State):
+    active = query_active(con, num)
+    id = active[0][0]
+    update = f"UPDATE {TABLE} SET {STATE}={new_state.value} WHERE id=?"
+    logging.debug(f"Executing.. {update}, id={id}")
     with con:
-        con.execute(
-            f"UPDATE {TABLE} SET {STATE}={new_state}"
-            f"ORDER BY ID DESC LIMIT 1 OFFSET {num}")
+        con.execute(update, [id])
 
 
 def create_row(stuff: list[str]) -> tuple[str, str]:

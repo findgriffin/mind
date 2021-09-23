@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from sqlite3 import Connection
 from typing import Optional
 import argparse
 import logging
@@ -50,15 +51,19 @@ def setup(argv) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def display(con, filters: Optional[list[str]] = None):
-    print("Currently minding...")
+def query(con: Connection) -> list[tuple]:
     with con:
         cur = con.execute(f"SELECT * FROM {TABLE} ORDER BY {ID} DESC")
-        for index, row in enumerate(cur.fetchmany(size=10), 1):
-            print(f" {index}. {row[0]} -> {row[1]}")
-        if cur.rowcount > 10:
-            print("And more...")
-        cur.close()
+        return cur.fetchmany(size=11)
+
+
+def display(con, filters: Optional[list[str]] = None):
+    print("Currently minding...")
+    fetched = query(con)
+    for index, row in enumerate(fetched[:10], 1):
+        print(f" {index}. {row[0]} -> {row[1]}")
+    if len(fetched) > 10:
+        print("And more...")
 
 
 def get_db(path: Path = DEFAULT_PATH):
@@ -90,12 +95,17 @@ def create_row(stuff: list[str]) -> tuple[str, str]:
     return id, body
 
 
+def add(con: Connection, stuff: list[str]) -> str:
+    row = create_row(stuff)
+    with con:
+        con.execute(f"INSERT INTO {TABLE} VALUES (?, ?, 0)", row)
+    return row[0]
+
+
 def run(args: argparse.Namespace) -> None:
     if ADD in args:
-        with get_db() as con:
-            row = create_row(args.StuffToAdd)
-            con.execute(f"INSERT INTO {TABLE} VALUES (?, ?, 0)", row)
-        con.close()
+        add(get_db(), args.StuffToAdd)
     else:
         with get_db() as con:
             display(con)
+    con.close()

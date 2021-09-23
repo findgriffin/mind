@@ -37,7 +37,7 @@ class TestSQLite(unittest.TestCase):
         # Given
         with mind.get_db(self.MEM) as con:
             mind.add(con, ["one", "two", "three"])
-            fetched = mind.query_active(con)
+            fetched = mind.query_stuff(con)
             # Then
             self.assertEqual(fetched[0][1], "one two three")
             now = datetime.utcnow()
@@ -55,7 +55,7 @@ class TestSQLite(unittest.TestCase):
                 sleep(0.03)
                 mind.add(con, f"entry {i}")
             # Then
-            fetched = mind.query_active(con)
+            fetched = mind.query_stuff(con)
             self.assertEqual(11, len(fetched))
             self.assertGreater(fromiso(fetched[0][0]),
                                fromiso(fetched[-1][0]))
@@ -65,10 +65,10 @@ class TestSQLite(unittest.TestCase):
         with mind.get_db(self.MEM) as con:
             mind.add(con, ["some stuff!!"])
             mind.add(con, ["some more stuff!!"])
-            active_before = mind.query_active(con)
+            active_before = mind.query_stuff(con)
             self.assertEqual(2, len(active_before))
             mind.update_state(con, 1, mind.State.TICKED)
-            active_after = mind.query_active(con)
+            active_after = mind.query_stuff(con)
             self.assertEqual(1, len(active_after))
             self.assertNotIn("more", active_after[0][1])
         con.close()
@@ -79,5 +79,5 @@ class TestSQLite(unittest.TestCase):
 
     def test_blank_db(self):
         with mind.get_db(Path("tests/data/blank.db")) as con:
-            mind.query_active(con)
+            mind.query_stuff(con)
         con.close()

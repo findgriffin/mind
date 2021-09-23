@@ -24,7 +24,7 @@ TABLES: dict[str, tuple[tuple[str, ...], ...]] = {
     STUFF: ((ID, TEXT, NOT_NULL, PRIMARY_KEY), (BODY, TEXT, NOT_NULL),
             (STATE, INTEGER, NOT_NULL)),
     # Using ID=stuff.ID here means you can get the most recently used tags
-    # easily.
+    # easily. Shuould be FOREIGN KEY (thing) REFERENCES stuff(id) NOT NULL
     TAGS: ((ID, TEXT, NOT_NULL), (TAG, TEXT, NOT_NULL))
 }
 
@@ -63,18 +63,19 @@ def setup(argv) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def query_active(con: Connection, num: Optional[int] = None) -> list[tuple]:
-    cmd = f"SELECT * FROM {STUFF} WHERE state=0 ORDER BY {ID} DESC"
-    if num:
-        cmd += f" LIMIT 1 OFFSET {num-1}"
+def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
+                limit: int = 11, start: int = 1) -> list[tuple]:
+    order = "DESC" if latest else "ASC"
     with con:
-        cur = con.execute(cmd)
-        return cur.fetchmany(size=11)
+        cur = con.execute(f"SELECT * FROM {STUFF} WHERE state={state.value} "
+                          f"ORDER BY {ID} {order} LIMIT {limit} "
+                          f"OFFSET {start-1}")
+        return cur.fetchall()
 
 
 def display(con, filters: Optional[list[str]] = None):
     print("Currently minding...")
-    fetched = query_active(con)
+    fetched = query_stuff(con)
     for index, row in enumerate(fetched[:10], 1):
         print(f" {index}. {row[0]} -> {row[1]}")
     if len(fetched) > 10:
@@ -94,7 +95,7 @@ def get_db(path: Path = DEFAULT_PATH):
 
 
 def update_state(con, num: int, new_state: State):
-    active = query_active(con, num)
+    active = query_stuff(con, limit=1, start=num)
     id = active[0][0]
     update = f"UPDATE {STUFF} SET {STATE}={new_state.value} WHERE id=?"
     logging.debug(f"Executing.. {update}, id={id}")

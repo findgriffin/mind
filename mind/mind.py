@@ -3,10 +3,14 @@ from pathlib import Path
 from typing import Optional
 import argparse
 import logging
+import sqlite3
 
 
-DEFAULT_PATH = Path("~/.mind.txt").expanduser()
+ID = "id"
+BODY = "body"
 ADD = "StuffToAdd"
+DEFAULT_PATH = Path("~/.mind.db").expanduser()
+TABLE = "stuff"
 
 
 def setup(argv) -> argparse.Namespace:
@@ -38,24 +42,28 @@ def setup(argv) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def ls(db: list[str], filters: Optional[list[str]] = None):
+def ls(con, filters: Optional[list[str]] = None):
     print("Currently minding...")
-    for index, row in enumerate(db[:10], 1):
-        print(f"  {index}. {row.strip()}")
-    if len(db) > 10:
-        print("And more...")
+    with con:
+        cur = con.execute(f"SELECT * FROM {TABLE} ORDER BY {ID} DESC")
+        for index, row in enumerate(cur.fetchmany(size=10), 1):
+            print(f" {index}. {row[0]} -> {row[1]}")
+        if cur.rowcount > 10:
+            print("And more...")
+        cur.close()
 
 
-def get_db(path: Path = DEFAULT_PATH) -> list[str]:
+def get_db(path: Path = DEFAULT_PATH):
     if path.exists():
         logging.debug(f"Opening DB: {path}")
-        with open(path, "r") as db:
-            lines = db.readlines()
-            lines.sort(reverse=True)
-            return lines
+        return sqlite3.connect(path)
     else:
         logging.debug("Creating new, empty DB.")
-        return []
+        with sqlite3.connect(path) as con:
+            id_field = f"{ID} TEXT PRIMARY KEY"
+            body_field = f"{BODY} TEXT NOT NULL"
+            con.execute(f"CREATE TABLE {TABLE}({id_field}, {body_field})")
+        return con
 
 
 def write_db(db: list[str], path: Path = DEFAULT_PATH):
@@ -64,17 +72,20 @@ def write_db(db: list[str], path: Path = DEFAULT_PATH):
         output.writelines(db)
 
 
-def create_row(stuff: list[str]) -> str:
-    new = f"{datetime.utcnow().isoformat()}, {' '.join(stuff)}\n"
-    logging.debug(f"Writing: {new}")
-    return new
+def create_row(stuff: list[str]) -> tuple[str, str]:
+    id = datetime.utcnow().isoformat()
+    body = ' '.join(stuff)
+
+    logging.debug(f"Writing: {id}: {body}")
+    return id, body
 
 
 def run(args: argparse.Namespace) -> None:
     if ADD in args:
-        db = get_db()
-        db.insert(0, create_row(args.StuffToAdd))
-        write_db(db)
+        with get_db() as con:
+            row = create_row(args.StuffToAdd)
+            con.execute(f"INSERT INTO {TABLE} VALUES (?, ?)", row)
+        con.close()
     else:
-        db = get_db()
-        ls(db)
+        with get_db() as con:
+            ls(con)

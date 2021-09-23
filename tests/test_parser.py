@@ -11,7 +11,6 @@ class TestParser(unittest.TestCase):
         result = mind.setup(input)
         # Then
         self.assertFalse(result.verbose)
-        self.assertFalse(result.stuff)
 
     def test_parser_add(self):
         # Given
@@ -19,4 +18,4 @@ class TestParser(unittest.TestCase):
         # When
         result = mind.setup(input)
         # Then
-        self.assertListEqual(result.StuffToAdd, input[1:])
+        self.assertListEqual(result.add, input[1:])

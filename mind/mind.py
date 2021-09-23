@@ -22,31 +22,25 @@ class State(Enum):
     FORGOTTEN = 2
 
 
+def add_command(sub_parsers, name, help):
+    command = sub_parsers.add_parser(name)
+    command.add_argument(name, type=str, nargs="+", help=help)
+
+
 def setup(argv) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Hello! I'm here to mind your stuff for you.")
 
-    sub_parsers = parser.add_subparsers(help="sub-command help")
+    sub_parsers = parser.add_subparsers(help="Do '.. {cmd} -h' to get "
+                                             "help for subcommands.")
 
-    parser_ls = sub_parsers.add_parser("ls", help="List stuff.")
-    parser_ls.add_argument("filter", type=str, nargs="*",
-                           help="Filter(s) for what to list.")
-    # TODO: Does filtering work by OR vs AND.
-    #       E.g. does #shopping #baby filter for shopping AND baby?
+    add_command(sub_parsers, "add", "Add some stuff to mind.")
+    add_command(sub_parsers, "tick", "Which piece(s) of stuff to tick off.")
+    add_command(sub_parsers, "list", "Which piece(s) of stuff to list.")
+    add_command(sub_parsers, "forget", "Which piece of stuff to forget.")
 
-    parser_forget = sub_parsers.add_parser("forget")
-    parser_forget.add_argument("StuffToForget", nargs="+")
-
-    parser_tick = sub_parsers.add_parser("tick")
-    parser_tick.add_argument("StuffToTick", type=str, nargs="+")
-
-    parser_add = sub_parsers.add_parser("add")
-    parser_add.add_argument(ADD, type=str, nargs="+")
-
-    parser.add_argument("stuff", type=str, nargs="*", default=None,
-                        help="Stuff you want to add...")
     parser.add_argument("-v", "--verbose",  action="store_true",
-                        help="Enable verbose logging.")
+                        help="Enable verbose output.")
 
     return parser.parse_args(argv)
 

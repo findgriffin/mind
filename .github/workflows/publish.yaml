@@ -27,4 +27,4 @@ jobs:
         env:
           NAME: ${{ secrets.NAME }}
         run: |
-          ./run.py --name Davo
+          ./run.py

@@ -62,3 +62,12 @@ class TestSQLite(unittest.TestCase):
             self.assertEqual(1, len(active_after))
             self.assertNotIn("more", active_after[0][1])
         con.close()
+
+    def test_display_empty(self):
+        with mind.get_db(self.MEM) as con:
+            mind.display(con)
+
+    def test_blank_db(self):
+        with mind.get_db(Path("tests/data/blank.db")) as con:
+            mind.query_active(con)
+        con.close()

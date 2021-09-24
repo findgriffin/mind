@@ -57,7 +57,7 @@ class TestSQLite(unittest.TestCase):
                 mind.do_add(con, f"entry {i}")
             # Then
             fetched = mind.query_stuff(con)
-            self.assertEqual(11, len(fetched))
+            self.assertEqual(10, len(fetched))
             self.assertGreater(fromiso(fetched[0][0]),
                                fromiso(fetched[-1][0]))
         con.close()

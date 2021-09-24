@@ -18,6 +18,7 @@ TAGS = "tags"
 TEXT = "TEXT"
 INTEGER = "INTEGER"
 NOT_NULL = "NOT NULL"
+PAGE_SIZE = 9
 PRIMARY_KEY = "PRIMARY KEY"
 TABLES: dict[str, tuple[tuple[str, ...], ...]] = {
     STUFF: ((ID, TEXT, NOT_NULL, PRIMARY_KEY), (BODY, TEXT, NOT_NULL),
@@ -103,7 +104,7 @@ def parse_item(args: list[str]) -> int:
 
 
 def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
-                limit: int = 11, start: int = 1) -> list[Stuff]:
+                limit: int = PAGE_SIZE+1, start: int = 1) -> list[Stuff]:
     order = "DESC" if latest else "ASC"
     with con:
         cur = con.execute(f"SELECT * FROM {STUFF} WHERE state={state.value} "
@@ -153,9 +154,9 @@ def do_list(con: Connection, *, args: list[str] = None,
             clean=False) -> list[str]:
     output = ["Currently minding..."]
     fetched = query_stuff(con, latest=not clean)
-    for index, row in enumerate(fetched[:10], 1):
-        output.append(f" {index}. {row[0]} -> {row[1]}")
-    if len(fetched) > 10:
+    for index, row in enumerate(fetched[:PAGE_SIZE], 1):
+        output.append(f" {index}. {row}")
+    if len(fetched) > PAGE_SIZE:
         output.append("And more...")
     return output
 

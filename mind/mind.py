@@ -2,7 +2,6 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from sqlite3 import Connection
-from typing import Optional
 import argparse
 import logging
 import sqlite3
@@ -10,8 +9,8 @@ import sqlite3
 
 ID = "id"
 BODY = "body"
-ADD = "StuffToAdd"
-DEFAULT_PATH = Path("~/.mind.db").expanduser()
+DEFAULT_DB = "~/.mind.db"
+DOTS = "..."
 STATE = "state"
 STUFF = "stuff"
 TAG = "tag"
@@ -34,15 +33,43 @@ def create_cmd(name: str, schema: tuple[tuple[str, ...], ...]) -> str:
     return f"CREATE TABLE {name}({columns})"
 
 
+class Cmd(Enum):
+    ADD = "add"
+    CLEAN = "clean"
+    FORGET = "forget"
+    LIST = "list"
+    TICK = "tick"
+
+
 class State(Enum):
     ACTIVE = 0
     TICKED = 1
     FORGOTTEN = 2
 
 
-def add_command(sub_parsers, name, help):
+class Stuff(tuple[str, str]):
+    PREVIEW_LENGTH = 40
+
+    def human_id(self):
+        return self[0][:16]
+
+    def preview(self, length=PREVIEW_LENGTH):
+        first_line = self[1].splitlines()[0]
+        if len(first_line) > length:
+            return first_line[:length].strip() + DOTS
+        else:
+            return first_line
+
+    def __str__(self):
+        return f"{self.human_id()} -> {self.preview()}"
+
+    def __repr__(self):
+        return f"Stuff[{self[0]} -> {self.preview(length=20)}]"
+
+
+def add_command(sub_parsers, name, help, nargs=1):
     command = sub_parsers.add_parser(name)
-    command.add_argument(name, type=str, nargs="+", help=help)
+    command.add_argument(name, type=str, nargs=nargs, help=help)
 
 
 def setup(argv) -> argparse.Namespace:
@@ -52,37 +79,41 @@ def setup(argv) -> argparse.Namespace:
     sub_parsers = parser.add_subparsers(help="Do '.. {cmd} -h' to get "
                                              "help for subcommands.")
 
-    add_command(sub_parsers, "add", "Add some stuff to mind.")
-    add_command(sub_parsers, "tick", "Which piece(s) of stuff to tick off.")
-    add_command(sub_parsers, "list", "Which piece(s) of stuff to list.")
-    add_command(sub_parsers, "forget", "Which piece of stuff to forget.")
-
+    add_command(sub_parsers, Cmd.ADD.value, "Add stuff to mind.", nargs="+")
+    add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
+    add_command(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
+    add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
+    add_command(sub_parsers, Cmd.CLEAN.value,
+                "List your oldest stuff, so you can clean it up ;).")
+    parser.add_argument("--db", type=str, default=DEFAULT_DB,
+                        help=f"DB file, defaults to {DEFAULT_DB}")
     parser.add_argument("-v", "--verbose",  action="store_true",
                         help="Enable verbose output.")
 
     return parser.parse_args(argv)
 
 
+def parse_item(args: list[str]) -> int:
+    if len(args) != 1:
+        raise ValueError("Expected one argument.")
+    elif args[0].isdigit():
+        return int(args[0])
+    else:
+        raise ValueError(f"Argument {args[0]} is invalid, must be an int.")
+
+
 def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
-                limit: int = 11, start: int = 1) -> list[tuple]:
+                limit: int = 11, start: int = 1) -> list[Stuff]:
     order = "DESC" if latest else "ASC"
     with con:
         cur = con.execute(f"SELECT * FROM {STUFF} WHERE state={state.value} "
                           f"ORDER BY {ID} {order} LIMIT {limit} "
                           f"OFFSET {start-1}")
-        return cur.fetchall()
+        return [Stuff(row) for row in cur.fetchall()]
 
 
-def display(con, filters: Optional[list[str]] = None):
-    print("Currently minding...")
-    fetched = query_stuff(con)
-    for index, row in enumerate(fetched[:10], 1):
-        print(f" {index}. {row[0]} -> {row[1]}")
-    if len(fetched) > 10:
-        print("And more...")
-
-
-def get_db(path: Path = DEFAULT_PATH):
+def get_db(filename: str = DEFAULT_DB):
+    path = Path(filename).expanduser()
     if path.exists():
         logging.debug(f"Opening DB: {path}")
         return sqlite3.connect(path)
@@ -103,25 +134,62 @@ def update_state(con, num: int, new_state: State):
         con.execute(update, [id])
 
 
-def create_row(stuff: list[str]) -> tuple[str, str]:
+def new_stuff(stuff: list[str]) -> Stuff:
     id = datetime.utcnow().isoformat()
     body = ' '.join(stuff)
 
-    logging.debug(f"Writing: {id}: {body}")
-    return id, body
+    return Stuff((id, body))
 
 
-def add(con: Connection, stuff: list[str]) -> str:
-    row = create_row(stuff)
+def do_add(con: Connection, args: list[str]) -> list[str]:
+    logging.debug(f"Doing add: {args}")
+    row = new_stuff(args)
     with con:
         con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, 0)", row)
-    return row[0]
+    return [f"Added {row}"]
 
 
-def run(args: argparse.Namespace) -> None:
-    if ADD in args:
-        add(get_db(), args.StuffToAdd)
+def do_list(con: Connection, *, args: list[str] = None,
+            clean=False) -> list[str]:
+    output = ["Currently minding..."]
+    fetched = query_stuff(con, latest=not clean)
+    for index, row in enumerate(fetched[:10], 1):
+        output.append(f" {index}. {row[0]} -> {row[1]}")
+    if len(fetched) > 10:
+        output.append("And more...")
+    return output
+
+
+def do_forget(con: Connection, args: list[str]):
+    logging.debug(f"Doing forget: {args}")
+    return ["Not implemented..."]
+
+
+def do_tick(con: Connection, args: list[str]):
+    logging.debug(f"Doing tick: {args} ")
+    id = parse_item(args)
+    stuff = query_stuff(con, limit=1, start=id)
+    if len(stuff) == 1:
+        return [f"Marking as ticked: {stuff[0]}"]
+    elif len(stuff) == 0:
+        return([f"Unable to find stuff: [{id}]"])
     else:
-        with get_db() as con:
-            display(con)
+        raise RuntimeError(f"Query for 1 row returned {len(stuff)} rows.")
+
+
+def run(args: argparse.Namespace) -> list[str]:
+    logging.debug(f"Running with arguments: {args}")
+    with get_db(args.db) as con:
+        if Cmd.ADD.value in args:
+            return do_add(con, args.add)
+        elif Cmd.LIST.value in args:
+            return do_list(con, args=args.list)
+        elif Cmd.FORGET.value in args:
+            return do_forget(con, args.forget)
+        elif Cmd.TICK.value in args:
+            return do_tick(con, args.tick)
+        elif Cmd.CLEAN.value in args:
+            return do_list(con, args=args.clean, clean=True)
+        else:
+            return do_list(con)
     con.close()

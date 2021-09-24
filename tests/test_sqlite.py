@@ -1,3 +1,4 @@
+from argparse import Namespace
 from datetime import datetime
 from pathlib import Path
 from time import sleep
@@ -9,7 +10,7 @@ fromiso = datetime.fromisoformat
 
 
 class TestSQLite(unittest.TestCase):
-    MEM = Path(":memory:")
+    MEM = ":memory:"
 
     def test_create_cmd(self):
         # Given
@@ -36,7 +37,7 @@ class TestSQLite(unittest.TestCase):
     def test_add_and_query(self):
         # Given
         with mind.get_db(self.MEM) as con:
-            mind.add(con, ["one", "two", "three"])
+            mind.do_add(con, ["one", "two", "three"])
             fetched = mind.query_stuff(con)
             # Then
             self.assertEqual(fetched[0][1], "one two three")
@@ -53,7 +54,7 @@ class TestSQLite(unittest.TestCase):
         with mind.get_db(self.MEM) as con:
             for i in range(20):
                 sleep(0.03)
-                mind.add(con, f"entry {i}")
+                mind.do_add(con, f"entry {i}")
             # Then
             fetched = mind.query_stuff(con)
             self.assertEqual(11, len(fetched))
@@ -63,8 +64,8 @@ class TestSQLite(unittest.TestCase):
 
     def test_update_no_entries(self):
         with mind.get_db(self.MEM) as con:
-            mind.add(con, ["some stuff!!"])
-            mind.add(con, ["some more stuff!!"])
+            mind.do_add(con, ["some stuff!!"])
+            mind.do_add(con, ["some more stuff!!"])
             active_before = mind.query_stuff(con)
             self.assertEqual(2, len(active_before))
             mind.update_state(con, 1, mind.State.TICKED)
@@ -73,11 +74,32 @@ class TestSQLite(unittest.TestCase):
             self.assertNotIn("more", active_after[0][1])
         con.close()
 
-    def test_display_empty(self):
+    def test_do_list_empty(self):
         with mind.get_db(self.MEM) as con:
-            mind.display(con)
+            mind.do_list(con)
 
     def test_blank_db(self):
         with mind.get_db(Path("tests/data/blank.db")) as con:
             mind.query_stuff(con)
         con.close()
+
+    def test_forget(self):
+        # Given
+        args = ["1"]
+        with mind.get_db(self.MEM) as con:
+            # When
+            output = mind.do_forget(con, args)
+            # Then
+            self.assertListEqual(["Not implemented..."], output)
+
+    def test_tick_empty_db(self):
+        # Given
+        args = ["1"]
+        with mind.get_db(self.MEM) as con:
+            # When
+            output = mind.do_tick(con, args)
+            # Then
+            self.assertListEqual(["Unable to find stuff: [1]"], output)
+
+    def test_run(self):
+        mind.run(Namespace(db=self.MEM))

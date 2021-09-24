@@ -160,21 +160,25 @@ def do_list(con: Connection, *, args: list[str] = None,
     return output
 
 
-def do_forget(con: Connection, args: list[str]):
-    logging.debug(f"Doing forget: {args}")
-    return ["Not implemented..."]
-
-
-def do_tick(con: Connection, args: list[str]):
-    logging.debug(f"Doing tick: {args} ")
+def do_state_change(con: Connection, name: str,
+                    args: list[str], state: State) -> list[str]:
     id = parse_item(args)
     stuff = query_stuff(con, limit=1, start=id)
     if len(stuff) == 1:
-        return [f"Marking as ticked: {stuff[0]}"]
+        update_state(con, id, state)
+        return [f"{state.name.capitalize()}: {stuff[0]}"]
     elif len(stuff) == 0:
         return([f"Unable to find stuff: [{id}]"])
     else:
         raise RuntimeError(f"Query for 1 row returned {len(stuff)} rows.")
+
+
+def do_forget(con: Connection, args: list[str]):
+    return do_state_change(con, Cmd.FORGET.name, args, State.FORGOTTEN)
+
+
+def do_tick(con: Connection, args: list[str]):
+    return do_state_change(con, Cmd.TICK.name, args, State.TICKED)
 
 
 def run(args: argparse.Namespace) -> list[str]:

@@ -90,7 +90,7 @@ class TestSQLite(unittest.TestCase):
             # When
             output = mind.do_forget(con, args)
             # Then
-            self.assertListEqual(["Not implemented..."], output)
+            self.assertListEqual(["Unable to find stuff: [1]"], output)
 
     def test_tick_empty_db(self):
         # Given

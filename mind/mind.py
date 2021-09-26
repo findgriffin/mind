@@ -148,19 +148,23 @@ def extract_tags(raw_line: str):
     return SPACE.join(content), tags
 
 
-def new_stuff(stuff: list[str]) -> Stuff:
+def new_stuff(hunks: list[str], joiner=SPACE) -> tuple[Stuff, set[str]]:
     id = datetime.utcnow().isoformat()
-    body = ' '.join(stuff)
-
-    return Stuff((id, body))
+    cleaned: list[str] = []
+    all_tags: set[str] = set()
+    for hunk in hunks:
+        body, tags = extract_tags(hunk)
+        all_tags = all_tags.union(tags)
+        cleaned.append(body)
+    return Stuff((id, joiner.join(cleaned))), all_tags
 
 
 def do_add(con: Connection, args: list[str]) -> list[str]:
     logging.debug(f"Doing add: {args}")
-    row = new_stuff(args)
+    stuff, tags = new_stuff(args)
     with con:
-        con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, 0)", row)
-    return [f"Added {row}"]
+        con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, 0)", stuff)
+    return [f"Added {stuff}"]
 
 
 def do_list(con: Connection, *, args: list[str] = None,

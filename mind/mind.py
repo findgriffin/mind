@@ -11,10 +11,12 @@ ID = "id"
 BODY = "body"
 DEFAULT_DB = "~/.mind.db"
 DOTS = "..."
+SPACE = " "
 STATE = "state"
 STUFF = "stuff"
 TAG = "tag"
 TAGS = "tags"
+TAG_PREFIX = "#"
 TEXT = "TEXT"
 INTEGER = "INTEGER"
 NOT_NULL = "NOT NULL"
@@ -133,6 +135,17 @@ def update_state(con, num: int, new_state: State):
     logging.debug(f"Executing.. {update}, id={id}")
     with con:
         con.execute(update, [id])
+
+
+def extract_tags(raw_line: str):
+    tags: set[str] = set()
+    content: list[str] = []
+    for word in raw_line.split():
+        if len(word) > 1 and word.startswith(TAG_PREFIX):
+            tags.add(word[1:])
+        else:
+            content.append(word)
+    return SPACE.join(content), tags
 
 
 def new_stuff(stuff: list[str]) -> Stuff:

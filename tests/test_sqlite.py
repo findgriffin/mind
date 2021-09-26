@@ -74,6 +74,18 @@ class TestSQLite(unittest.TestCase):
             self.assertNotIn("more", active_after[0][1])
         con.close()
 
+    def test_add_with_tags(self):
+        with mind.get_db(self.MEM) as con:
+            mind.do_add(con, ["some stuff!!! #stuff"])
+            mind.do_add(con, ["more stuff!!! #thing"])
+            mind.do_add(con, ["less stuff??? #hello"])
+            mind.do_add(con, ["less stuff??? #thing"])
+            thing = mind.query_tags(con, "thing")
+            self.assertGreater(thing[0][0], thing[1][0])
+            self.assertEqual(thing[0][1], "thing")
+            self.assertEqual(thing[1][1], "thing")
+        con.close()
+
     def test_do_list_empty(self):
         with mind.get_db(self.MEM) as con:
             mind.do_list(con)

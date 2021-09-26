@@ -2,10 +2,10 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from sqlite3 import Connection
+from typing import NamedTuple
 import argparse
 import logging
 import sqlite3
-
 
 ID = "id"
 BODY = "body"
@@ -21,6 +21,7 @@ TEXT = "TEXT"
 INTEGER = "INTEGER"
 NOT_NULL = "NOT NULL"
 PAGE_SIZE = 9
+PREVIEW_LENGTH = 40
 PRIMARY_KEY = "PRIMARY KEY"
 TABLES: dict[str, tuple[tuple[str, ...], ...]] = {
     STUFF: ((ID, TEXT, NOT_NULL, PRIMARY_KEY), (BODY, TEXT, NOT_NULL),
@@ -50,8 +51,18 @@ class State(Enum):
     FORGOTTEN = 2
 
 
-class Stuff(tuple[str, str]):
-    PREVIEW_LENGTH = 40
+sqlite3.register_adapter(State, lambda s: s.value)
+
+
+class Tag(NamedTuple):
+    stuff_id: str
+    tag: str
+
+
+class Stuff(NamedTuple):
+    id: str
+    body: str
+    state: State = State.ACTIVE
 
     def human_id(self):
         return self[0][:16]
@@ -112,7 +123,15 @@ def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
         cur = con.execute(f"SELECT * FROM {STUFF} WHERE state={state.value} "
                           f"ORDER BY {ID} {order} LIMIT {limit} "
                           f"OFFSET {start-1}")
-        return [Stuff(row) for row in cur.fetchall()]
+        return [Stuff(*row) for row in cur.fetchall()]
+
+
+def query_tags(con: Connection, tag, *, latest: bool = True) -> list[Tag]:
+    order = "DESC" if latest else "ASC"
+    with con:
+        cur = con.execute(f"SELECT * FROM {TAGS} WHERE {TAG}=? "
+                          f"ORDER BY {ID} {order}", [tag])
+        return [Tag(*row) for row in cur.fetchall()]
 
 
 def get_db(filename: str = DEFAULT_DB):
@@ -156,14 +175,16 @@ def new_stuff(hunks: list[str], joiner=SPACE) -> tuple[Stuff, set[str]]:
         body, tags = extract_tags(hunk)
         all_tags = all_tags.union(tags)
         cleaned.append(body)
-    return Stuff((id, joiner.join(cleaned))), all_tags
+    return Stuff(id, joiner.join(cleaned), State.ACTIVE), all_tags
 
 
 def do_add(con: Connection, args: list[str]) -> list[str]:
     logging.debug(f"Doing add: {args}")
     stuff, tags = new_stuff(args)
     with con:
-        con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, 0)", stuff)
+        con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)
+        for tag in tags:
+            con.execute(f"INSERT INTO {TAGS} VALUES (?, ?)", (stuff.id, tag))
     return [f"Added {stuff}"]
 
 

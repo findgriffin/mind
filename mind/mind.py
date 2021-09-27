@@ -301,19 +301,20 @@ def do_add(con: Connection, args: argparse.Namespace) -> list[str]:
         raise NotImplementedError
 
 
+COMMANDS = {
+    "add": do_add,
+    "list": do_list,
+    "forget": do_forget,
+    "tick": do_tick,
+    "clean": do_list
+}
+
+
 def run(args: argparse.Namespace) -> list[str]:
     logging.debug(f"Running with arguments: {args}")
     with get_db(args.db) as con:
-        if args.cmd == Cmd.ADD.value:
-            return do_add(con, args)
-        elif Cmd.LIST.value in args:
-            return do_list(con, args)
-        elif Cmd.FORGET.value in args:
-            return do_forget(con, args)
-        elif Cmd.TICK.value in args:
-            return do_tick(con, args)
-        elif Cmd.CLEAN.value in args:
-            return do_list(con, args)
+        if args.cmd in COMMANDS:
+            return COMMANDS[args.cmd](con, args)
         else:
             return do_list(con, args)
     con.close()

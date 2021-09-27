@@ -219,14 +219,20 @@ def update_state(con, num: int, new_state: State):
         con.execute(update, [id])
 
 
+def is_tag(word: str) -> Optional[str]:
+    if len(word) > 1 and word.startswith(TAG_PREFIX):
+        candidate = word[1:]
+        if candidate.isalnum():
+            return candidate.lower()
+    return None
+
+
 def extract_tags(raw_line: str):
     tags: set[str] = set()
     content: list[str] = []
     for word in raw_line.split():
-        if len(word) > 1 and word.startswith(TAG_PREFIX):
-            tags.add(word[1:])
-        else:
-            content.append(word)
+        tag = is_tag(word)
+        tags.add(tag) if tag else content.append(word)
     return SPACE.join(content), tags
 
 

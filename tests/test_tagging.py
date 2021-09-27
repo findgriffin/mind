@@ -59,3 +59,17 @@ class TestTagging(unittest.TestCase):
         # Then
         self.assertEqual(output, "# Heading Next line * Indented")
         self.assertSetEqual(tags, set())
+
+    def test_valid_tags(self):
+        self.assertEqual("1", mind.is_tag("#1"))
+        self.assertEqual("1333tc0d3", mind.is_tag("#1333tc0d3"))
+        self.assertEqual("hello", mind.is_tag("#hEllo"))
+
+    def test_not_tags(self):
+        self.assertFalse(mind.is_tag("##"))
+        self.assertFalse(mind.is_tag("#wut is"))
+        self.assertFalse(mind.is_tag("#wut "))
+        self.assertFalse(mind.is_tag("#w!t"))
+        self.assertFalse(mind.is_tag("#surprise!"))
+        self.assertFalse(mind.is_tag("#foo\n"))
+        self.assertFalse(mind.is_tag("#"))

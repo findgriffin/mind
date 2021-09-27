@@ -1,3 +1,5 @@
+import random
+import string
 from argparse import Namespace
 from datetime import datetime
 from pathlib import Path
@@ -67,14 +69,34 @@ class TestSQLite(unittest.TestCase):
     def test_add_with_tags(self):
         with mind.get_db(self.MEM) as con:
             mind.do_add(con, ["some stuff!!! #stuff"])
+            sleep(.02)
             mind.do_add(con, ["more stuff!!! #thing"])
+            sleep(.02)
             mind.do_add(con, ["less stuff??? #hello"])
+            sleep(.02)
             mind.do_add(con, ["less stuff??? #thing"])
             thing = mind.query_tags(con, "thing")
             self.assertGreater(thing[0][0], thing[1][0])
             self.assertEqual(thing[0][1], "thing")
             self.assertEqual(thing[1][1], "thing")
         con.close()
+
+    def test_get_lots_of_tags(self):
+        # Given
+        inserted_tags = 20
+        expected_tags = 15
+        inserted_rows = 40
+        with mind.get_db(self.MEM) as con:
+            for i in range(inserted_rows):
+                letters = random.choices(string.ascii_letters, k=11)
+                mind.do_add(con, [f"{letters} #{i % inserted_tags}"])
+                sleep(.005)
+            # When
+            output = mind.get_latest_tags(con)
+            # Then
+            self.assertEqual(len(output), expected_tags)
+            for i, tag in enumerate(output):
+                self.assertEqual(tag.tag, str(i % inserted_tags))
 
     def test_do_list_empty(self):
         with mind.get_db(self.MEM) as con:

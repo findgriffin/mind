@@ -24,3 +24,9 @@ class TestStuff(unittest.TestCase):
         # Then
         self.assertEqual(len(output), 63)
         self.assertEqual("ourty c...", output[-10:])
+
+    def test_human_readable_empty_body(self):
+        # Given
+        stuff = mind.Stuff(id="123", body=None, state=0)
+        # When
+        self.assertEqual(stuff.preview(), "EMPTY BODY")

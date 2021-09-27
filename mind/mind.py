@@ -95,20 +95,23 @@ class Stuff(NamedTuple):
     state: State = State.ACTIVE
 
     def human_id(self):
-        return self[0][:16]
+        return self.id[:16]
 
     def preview(self, length=PREVIEW_LENGTH):
-        first_line = self[1].splitlines()[0]
-        if len(first_line) > length:
-            return first_line[:length].strip() + DOTS
+        if self.body:
+            first_line = self.body.splitlines()[0]
+            if len(first_line) > length:
+                return first_line[:length].strip() + DOTS
+            else:
+                return first_line
         else:
-            return first_line
+            return "EMPTY BODY"
 
     def __str__(self):
         return f"{self.human_id()} -> {self.preview()}"
 
     def __repr__(self):
-        return f"Stuff[{self[0]} -> {self.preview(length=20)}]"
+        return f"Stuff[{self.id} -> {self.preview(length=20)}]"
 
 
 TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag}

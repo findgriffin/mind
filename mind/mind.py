@@ -152,8 +152,8 @@ def setup(argv) -> argparse.Namespace:
     add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
     add_command(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
     add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
-    add_command(sub_parsers, Cmd.CLEAN.value,
-                "List your oldest stuff, so you can clean it up ;).")
+    add_command(sub_parsers, Cmd.CLEAN.value, nargs='?',
+                help="List your oldest stuff, so you can clean it up ;).")
     parser.add_argument("--db", type=str, default=DEFAULT_DB,
                         help=f"DB file, defaults to {DEFAULT_DB}")
     parser.add_argument("-v", "--verbose",  action="store_true",
@@ -255,10 +255,10 @@ def do_add(con: Connection, content: list[str]) -> list[str]:
     return [f"Added {stuff}"]
 
 
-def do_list(con: Connection, *, args: list[str] = None,
-            clean=False) -> list[str]:
+def do_list(con: Connection, *, args: argparse.Namespace) -> list[str]:
     output = ["Currently minding..."]
-    fetched = query_stuff(con, latest=not clean)
+    latest = CMD not in args or args.cmd != Cmd.CLEAN.value
+    fetched = query_stuff(con, latest=latest)
     for index, row in enumerate(fetched[:PAGE_SIZE], 1):
         output.append(f" {index}. {row}")
     if len(fetched) > PAGE_SIZE:
@@ -304,21 +304,18 @@ def add_content(args: argparse.Namespace) -> list[str]:
 def run(args: argparse.Namespace) -> list[str]:
     logging.debug(f"Running with arguments: {args}")
     with get_db(args.db) as con:
-        if CMD in args:
-            if args.cmd == Cmd.ADD.value:
-                return do_add(con, add_content(args))
-            elif Cmd.LIST.value in args:
-                return do_list(con, args=args.list)
-            elif Cmd.FORGET.value in args:
-                return do_forget(con, args.forget)
-            elif Cmd.TICK.value in args:
-                return do_tick(con, args.tick)
-            elif Cmd.CLEAN.value in args:
-                return do_list(con, args=args.clean, clean=True)
-            else:
-                raise ValueError("Unknown command " + args.cmd)
+        if args.cmd == Cmd.ADD.value:
+            return do_add(con, add_content(args))
+        elif Cmd.LIST.value in args:
+            return do_list(con, args=args)
+        elif Cmd.FORGET.value in args:
+            return do_forget(con, args.forget)
+        elif Cmd.TICK.value in args:
+            return do_tick(con, args.tick)
+        elif Cmd.CLEAN.value in args:
+            return do_list(con, args=args)
         else:
-            return do_list(con)
+            return do_list(con, args=args)
     con.close()
 
 

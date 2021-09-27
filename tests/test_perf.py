@@ -1,3 +1,4 @@
+from argparse import Namespace
 from datetime import datetime
 from random import choices, randint
 from string import ascii_letters, ascii_lowercase, digits
@@ -27,7 +28,7 @@ class TestPerf(unittest.TestCase):
         start = datetime.now()
         for i in range(200):
             with mind.get_db(db_name) as con:
-                mind.do_list(con)
+                mind.do_list(con, args=Namespace(cmd=None))
         finish = datetime.now()
         os.remove(db_name)
 

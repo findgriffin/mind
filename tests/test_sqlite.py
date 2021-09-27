@@ -100,7 +100,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_do_list_empty(self):
         with mind.get_db(self.MEM) as con:
-            mind.do_list(con)
+            mind.do_list(con, args=Namespace(cmd=None))
 
     def test_blank_db(self):
         with mind.get_db(Path("tests/data/blank.db")) as con:
@@ -154,4 +154,4 @@ class TestSQLite(unittest.TestCase):
             self.assertListEqual(["Unable to find stuff: [1]"], output)
 
     def test_run(self):
-        mind.run(Namespace(db=self.MEM))
+        mind.run(Namespace(db=self.MEM, cmd=None))

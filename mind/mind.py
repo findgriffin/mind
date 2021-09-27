@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from sqlite3 import Connection
+from textwrap import wrap
 from typing import NamedTuple, Callable, Optional
 import argparse
 import logging
@@ -248,17 +249,16 @@ def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, set[str]]:
 
 
 def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
-    output = ["Currently minding..."]
     latest = CMD not in args or args.cmd != Cmd.CLEAN.value
+    noun = "latest" if latest else "oldest"
+    output = [f"Currently minding {noun} stuff..."]
     fetched = query_stuff(con, latest=latest)
     for index, row in enumerate(fetched[:PAGE_SIZE], 1):
         output.append(f" {index}. {row}")
     if len(fetched) > PAGE_SIZE:
         output.append("And more...")
     tags = ", ".join([t.tag for t in get_latest_tags(con)])
-    output.append(f"Latest tags: {tags}")
-
-    return output
+    return output + wrap(f"Latest tags: {tags}")
 
 
 def do_state_change(con: Connection, name: str,

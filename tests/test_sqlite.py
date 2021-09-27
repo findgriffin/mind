@@ -95,7 +95,7 @@ class TestSQLite(unittest.TestCase):
             output = mind.get_latest_tags(con)
             # Then
             self.assertEqual(len(output), expected_tags)
-            for i, tag in enumerate(output):
+            for i, tag in enumerate(reversed(output), start=5):
                 self.assertEqual(tag.tag, str(i % inserted_tags))
 
     def test_do_list_empty(self):

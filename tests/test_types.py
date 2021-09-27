@@ -9,7 +9,7 @@ class TestTypes(unittest.TestCase):
         # When
         cmd = mind.create_cmd2("tags", mind.Tag)
         # Then
-        self.assertEqual("CREATE TABLE tags(stuff_id INTEGER NOT NULL, "
+        self.assertEqual("CREATE TABLE tags(id INTEGER NOT NULL, "
                          "tag TEXT NOT NULL)", cmd)
 
     def test_stuff_table(self):

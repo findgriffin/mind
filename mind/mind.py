@@ -85,7 +85,7 @@ for t, mapping in TYPE_MAP.items():
 
 
 class Tag(NamedTuple):
-    stuff_id: datetime
+    id: datetime
     tag: str
 
 
@@ -175,13 +175,13 @@ def query_tags(con: Connection, tag, *, latest: bool = True) -> list[Tag]:
     order = "DESC" if latest else "ASC"
     with con:
         cur = con.execute(f"SELECT * FROM {TAGS} WHERE {TAG}=? "
-                          f"ORDER BY stuff_id {order}", [tag])
+                          f"ORDER BY {ID} {order}", [tag])
         return [Tag(*row) for row in cur.fetchall()]
 
 
 def get_latest_tags(con: Connection, limit=15) -> list[Tag]:
     with con:
-        cur = con.execute(f"SELECT * FROM {TAGS} ORDER BY stuff_id LIMIT 100")
+        cur = con.execute(f"SELECT * FROM {TAGS} ORDER BY {ID} DESC LIMIT 100")
         latest: dict[str, Tag] = {}
         for row in cur.fetchall():
             tag = Tag(*row)

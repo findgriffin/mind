@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from sqlite3 import Connection
-from textwrap import wrap
+from textwrap import wrap, shorten
 from typing import NamedTuple, Callable, Optional
 import argparse
 import logging
@@ -15,7 +15,6 @@ ID = "id"
 BODY = "body"
 CMD = "cmd"
 DEFAULT_DB = "~/.mind.db"
-DOTS = "..."
 NEWLINE = "\n"
 SPACE = " "
 STATE = "state"
@@ -27,7 +26,6 @@ TEXT = "TEXT"
 INTEGER = "INTEGER"
 NOT_NULL = "NOT NULL"
 PAGE_SIZE = 9
-PREVIEW_LENGTH = 40
 PRIMARY_KEY = " PRIMARY KEY "
 H_RULE = "--------------------------------"
 
@@ -100,15 +98,9 @@ class Stuff(NamedTuple):
     def human_id(self):
         return self.id[:16]
 
-    def preview(self, length=PREVIEW_LENGTH):
-        if self.body:
-            first_line = self.body.splitlines()[0]
-            if len(first_line) > length:
-                return first_line[:length].strip() + DOTS
-            else:
-                return first_line
-        else:
-            return "EMPTY BODY"
+    def preview(self, width=40):
+        return shorten(self.body.splitlines()[0], width=width,
+                       placeholder=" ...") if self.body else "EMPTY"
 
     def show(self, tags=[]) -> list[str]:
         return [
@@ -121,7 +113,7 @@ class Stuff(NamedTuple):
         return f"{self.human_id()} -> {self.preview()}"
 
     def __repr__(self):
-        return f"Stuff[{self.id} -> {self.preview(length=20)}]"
+        return f"Stuff[{self.id} -> {self.preview(width=20)}]"
 
 
 TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag}

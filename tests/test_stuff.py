@@ -12,8 +12,8 @@ class TestStuff(unittest.TestCase):
         stuff, tags = mind.new_stuff([body])
         output = stuff.__repr__()
         # Then
-        self.assertEqual(len(output), 59)  # .strip() remove last space
-        self.assertEqual("ion is...]", output[-10:])
+        self.assertEqual(len(output), 57)  # .strip() remove last space
+        self.assertEqual("ption ...]", output[-10:])
 
     def test_human_readable(self):
         # Given
@@ -22,11 +22,11 @@ class TestStuff(unittest.TestCase):
         stuff, tags = mind.new_stuff([body])
         output = f"{stuff}"
         # Then
-        self.assertEqual(len(output), 63)
-        self.assertEqual("ourty c...", output[-10:])
+        self.assertEqual(len(output), 55)
+        self.assertEqual("r than ...", output[-10:])
 
     def test_human_readable_empty_body(self):
         # Given
         stuff = mind.Stuff(id="123", body=None, state=0)
         # When
-        self.assertEqual(stuff.preview(), "EMPTY BODY")
+        self.assertEqual(stuff.preview(), "EMPTY")

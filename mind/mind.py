@@ -30,11 +30,6 @@ PREVIEW_LENGTH = 40
 PRIMARY_KEY = " PRIMARY KEY "
 
 
-def create_cmd(name: str, schema: tuple[tuple[str, ...], ...]) -> str:
-    columns = ", ".join([" ".join(column) for column in schema])
-    return f"CREATE TABLE {name}({columns})"
-
-
 class Cmd(Enum):
     ADD = "add"
     CLEAN = "clean"
@@ -169,11 +164,11 @@ def setup(argv) -> argparse.Namespace:
 
 def parse_item(args: list[str]) -> int:
     if len(args) != 1:
-        raise ValueError("Expected one argument.")
+        raise NotImplementedError("Only one item currently supported.")
     elif args[0].isdigit():
         return int(args[0])
     else:
-        raise ValueError(f"Argument {args[0]} is invalid, must be an int.")
+        raise NotImplementedError("Only numbered items currently supported.")
 
 
 def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
@@ -250,8 +245,7 @@ def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, set[str]]:
     return Stuff(id, joiner.join(cleaned), State.ACTIVE), all_tags
 
 
-def do_add(con: Connection, content: list[str],
-           f_name: Optional[str] = None) -> list[str]:
+def do_add(con: Connection, content: list[str]) -> list[str]:
     logging.debug(f"Doing add: {content}")
     stuff, tags = new_stuff(content)
     with con:

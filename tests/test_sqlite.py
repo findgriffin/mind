@@ -107,7 +107,19 @@ class TestSQLite(unittest.TestCase):
             mind.query_stuff(con)
         con.close()
 
-    def test_forget(self):
+    def test_forget_success(self):
+        # Given
+        args = ["1"]
+        with mind.get_db(self.MEM) as con:
+            mind.do_add(con, ["some content"])
+            # When
+            output = mind.do_forget(con, args)
+            # Then
+            self.assertEqual(1, len(output))
+            self.assertTrue(output[0].startswith("Forgotten: "))
+            self.assertTrue(output[0].endswith(" -> some content"))
+
+    def test_forget_when_empty(self):
         # Given
         args = ["1"]
         with mind.get_db(self.MEM) as con:
@@ -115,6 +127,22 @@ class TestSQLite(unittest.TestCase):
             output = mind.do_forget(con, args)
             # Then
             self.assertListEqual(["Unable to find stuff: [1]"], output)
+
+    def test_forget_tag_indexed(self):
+        # Given
+        args = ["#tag.1"]
+        with mind.get_db(self.MEM) as con:
+            # When
+            with self.assertRaises(NotImplementedError):
+                mind.do_forget(con, args)
+
+    def test_tick_multiple_args(self):
+        # Given
+        args = ["#tag.1", "wot"]
+        with mind.get_db(self.MEM) as con:
+            # When
+            with self.assertRaises(NotImplementedError):
+                mind.do_tick(con, args)
 
     def test_tick_empty_db(self):
         # Given

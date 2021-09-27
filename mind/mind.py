@@ -253,6 +253,9 @@ def do_list(con: Connection, *, args: list[str] = None,
         output.append(f" {index}. {row}")
     if len(fetched) > PAGE_SIZE:
         output.append("And more...")
+    tags = ", ".join([t.tag for t in get_latest_tags(con)])
+    output.append(f"Latest tags: {tags}")
+
     return output
 
 

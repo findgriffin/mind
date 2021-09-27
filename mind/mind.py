@@ -217,17 +217,27 @@ def get_latest_tags(con: Connection, limit=15) -> list[Tag]:
         return list(latest.values())[:limit]
 
 
-def get_db(filename: str = DEFAULT_DB):
+def get_db(filename: str = DEFAULT_DB, strict: bool = False):
     path = Path(filename).expanduser()
-    if path.exists():
-        logging.debug(f"Opening DB: {path}")
-        return sqlite3.connect(path)
-    else:
-        logging.debug("Creating new, empty DB.")
-        with sqlite3.connect(path) as con:
-            for name, schema in TABLES.items():
-                con.execute(create_cmd2(name, schema))
-            return con
+    exists = path.exists()
+    logging.debug(f"Opening DB {path}, exists: {path.exists()}")
+    with sqlite3.connect(path) as con:
+        for name, schema in TABLES.items():
+            create_cmd = create_cmd2(name, schema)
+            if exists:
+                cur = con.execute("SELECT * FROM sqlite_master WHERE "
+                                  "name=?", [name])
+                existing_db = cur.fetchone()[4]
+                if existing_db != create_cmd:
+                    msg = "Database tables do not match. Expected " \
+                          f"{create_cmd}, but found {existing_db}"
+                    if strict:
+                        raise RuntimeError(msg)
+                    else:
+                        logging.info(msg)
+            else:
+                con.execute(create_cmd)
+        return con
 
 
 def update_state(con, num: int, new_state: State):

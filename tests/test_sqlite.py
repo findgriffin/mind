@@ -29,7 +29,7 @@ class TestSQLite(unittest.TestCase):
     def test_add_and_query(self):
         # Given
         with mind.get_db(self.MEM) as con:
-            mind.do_add_2(con, ["one"])
+            mind.add_content(con, ["one"])
             fetched = mind.query_stuff(con)
             # Then
             self.assertEqual(fetched[0][1], "one")
@@ -46,7 +46,7 @@ class TestSQLite(unittest.TestCase):
         with mind.get_db(self.MEM) as con:
             for i in range(20):
                 sleep(0.03)
-                mind.do_add_2(con, f"entry {i}")
+                mind.add_content(con, [f"entry {i}"])
             # Then
             fetched = mind.query_stuff(con)
             self.assertEqual(10, len(fetched))
@@ -56,8 +56,8 @@ class TestSQLite(unittest.TestCase):
 
     def test_update_no_entries(self):
         with mind.get_db(self.MEM) as con:
-            mind.do_add_2(con, ["some stuff!!"])
-            mind.do_add_2(con, ["some more stuff!!"])
+            mind.add_content(con, ["some stuff!!"])
+            mind.add_content(con, ["some more stuff!!"])
             active_before = mind.query_stuff(con)
             self.assertEqual(2, len(active_before))
             mind.update_state(con, 1, mind.State.TICKED)
@@ -68,13 +68,13 @@ class TestSQLite(unittest.TestCase):
 
     def test_add_with_tags(self):
         with mind.get_db(self.MEM) as con:
-            mind.do_add_2(con, ["some stuff!!! #stuff"])
+            mind.add_content(con, ["some stuff!!! #stuff"])
             sleep(.02)
-            mind.do_add_2(con, ["more stuff!!! #thing"])
+            mind.add_content(con, ["more stuff!!! #thing"])
             sleep(.02)
-            mind.do_add_2(con, ["less stuff??? #hello"])
+            mind.add_content(con, ["less stuff??? #hello"])
             sleep(.02)
-            mind.do_add_2(con, ["less stuff??? #thing"])
+            mind.add_content(con, ["less stuff??? #thing"])
             thing = mind.query_tags(con, "thing")
             self.assertGreater(thing[0][0], thing[1][0])
             self.assertEqual(thing[0][1], "thing")
@@ -89,7 +89,7 @@ class TestSQLite(unittest.TestCase):
         with mind.get_db(self.MEM) as con:
             for i in range(inserted_rows):
                 letters = random.choices(string.ascii_letters, k=11)
-                mind.do_add_2(con, [f"{letters} #{i % inserted_tags}"])
+                mind.add_content(con, [f"{letters} #{i % inserted_tags}"])
                 sleep(.005)
             # When
             output = mind.get_latest_tags(con)
@@ -111,7 +111,7 @@ class TestSQLite(unittest.TestCase):
         # Given
         args = Namespace(forget=["1"])
         with mind.get_db(self.MEM) as con:
-            mind.do_add_2(con, ["some content"])
+            mind.add_content(con, ["some content"])
             # When
             output = mind.do_forget(con, args)
             # Then

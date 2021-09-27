@@ -271,16 +271,6 @@ def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, set[str]]:
     return Stuff(id, joiner.join(cleaned), State.ACTIVE), all_tags
 
 
-def do_add_2(con: Connection, content: list[str]) -> list[str]:
-    logging.debug(f"Doing add: {content}")
-    stuff, tags = new_stuff(content)
-    with con:
-        con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)
-        for tag in tags:
-            con.execute(f"INSERT INTO {TAGS} VALUES (?, ?)", (stuff.id, tag))
-    return [f"Added {stuff}"]
-
-
 def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
     output = ["Currently minding..."]
     latest = CMD not in args or args.cmd != Cmd.CLEAN.value
@@ -323,11 +313,21 @@ def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
     return rows[0].show(tags)
 
 
+def add_content(con: Connection, content: list[str]) -> list[str]:
+    logging.debug(f"Doing add: {content}")
+    stuff, tags = new_stuff(content)
+    with con:
+        con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)
+        for tag in tags:
+            con.execute(f"INSERT INTO {TAGS} VALUES (?, ?)", (stuff.id, tag))
+    return [f"Added {stuff}"]
+
+
 def do_add(con: Connection, args: argparse.Namespace) -> list[str]:
     if args.text:
-        return do_add_2(con, [args.text])
+        return add_content(con, [args.text])
     elif args.file:
-        return do_add_2(con, Path(args.file).read_text().splitlines())
+        return add_content(con, Path(args.file).read_text().splitlines())
     elif args.interactive:
         raise NotImplementedError
     else:
@@ -354,13 +354,15 @@ def run(args: argparse.Namespace) -> list[str]:
     con.close()
 
 
+def setup_logging(verbose: bool = False):
+    fmt = "%(levelname)s: %(message)s" if verbose else "%(message)s"
+    lvl = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(level=lvl, format=fmt)
+    logging.debug("Verbose logging enabled.")
+
+
 if __name__ == "__main__":
     args = setup(sys.argv[1:])
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG,
-                            format="%(levelname)s: %(message)s")
-        logging.info("Verbose logging enabled.")
-    else:
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
+    setup_logging(verbose=args.verbose)
     for line in run(args):
         print(line)

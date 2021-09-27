@@ -12,16 +12,6 @@ fromiso = datetime.fromisoformat
 class TestSQLite(unittest.TestCase):
     MEM = ":memory:"
 
-    def test_create_cmd(self):
-        # Given
-        name = "hello"
-        schema = mind.TABLES["stuff"]
-        # When
-        cmd = mind.create_cmd(name, schema=schema)
-        # Then
-        self.assertEqual("CREATE TABLE hello(id TEXT NOT NULL PRIMARY KEY, "
-                         "body TEXT NOT NULL, state INTEGER NOT NULL)", cmd)
-
     def test_get_db_inmem(self):
         # Given / When
         with mind.get_db(self.MEM) as con:
@@ -30,7 +20,7 @@ class TestSQLite(unittest.TestCase):
             self.assertFalse(con.in_transaction)
             cur = con.execute("SELECT * FROM sqlite_master")
             self.assertEqual(cur.fetchone()[-1],
-                             "CREATE TABLE stuff(id TEXT NOT NULL PRIMARY KEY,"
+                             "CREATE TABLE stuff(id TEXT NOT NULL,"
                              " body TEXT NOT NULL, state INTEGER NOT NULL)")
         con.close()
 

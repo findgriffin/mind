@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from sqlite3 import Connection
-from typing import NamedTuple
+from typing import NamedTuple, Callable, Optional
 import argparse
 import logging
 import sqlite3
@@ -22,14 +22,7 @@ INTEGER = "INTEGER"
 NOT_NULL = "NOT NULL"
 PAGE_SIZE = 9
 PREVIEW_LENGTH = 40
-PRIMARY_KEY = "PRIMARY KEY"
-TABLES: dict[str, tuple[tuple[str, ...], ...]] = {
-    STUFF: ((ID, TEXT, NOT_NULL, PRIMARY_KEY), (BODY, TEXT, NOT_NULL),
-            (STATE, INTEGER, NOT_NULL)),
-    # Using ID=stuff.ID here means you can get the most recently used tags
-    # easily. Shuould be FOREIGN KEY (thing) REFERENCES stuff(id) NOT NULL
-    TAGS: ((ID, TEXT, NOT_NULL), (TAG, TEXT, NOT_NULL))
-}
+PRIMARY_KEY = " PRIMARY KEY "
 
 
 def create_cmd(name: str, schema: tuple[tuple[str, ...], ...]) -> str:
@@ -51,11 +44,48 @@ class State(Enum):
     FORGOTTEN = 2
 
 
-sqlite3.register_adapter(State, lambda s: s.value)
+class SQLiteType(Enum):
+    NULL = "NULL"
+    INTEGER = "INTEGER"
+    REAL = "REAL"
+    TEXT = "TEXT"
+    BLOB = "BLOB"
+
+
+class SQLiteMapping(NamedTuple):
+    wire_type: SQLiteType
+    converter: Optional[Callable] = None
+    adapter: Optional[Callable] = None
+
+
+state_mapping = SQLiteMapping(wire_type=SQLiteType.INTEGER,
+                              adapter=lambda s: s.value,
+                              converter=State.__init__)
+dt_mapping = SQLiteMapping(
+    wire_type=SQLiteType.INTEGER,
+    adapter=lambda dt: dt.timestamp(),
+    converter=datetime.fromtimestamp)
+
+# None / Null not included here as there are no optional columns (yet)
+# Optional[int|str] could be mapped to removing the 'NOT NULL' constraint
+TYPE_MAP: dict[type, SQLiteMapping] = {
+    State: state_mapping,
+    datetime: dt_mapping,
+    int:    SQLiteMapping(wire_type=SQLiteType.INTEGER),
+    float:  SQLiteMapping(wire_type=SQLiteType.REAL),
+    str:    SQLiteMapping(wire_type=SQLiteType.TEXT),
+    bytes:  SQLiteMapping(wire_type=SQLiteType.BLOB)
+}
+
+for t, mapping in TYPE_MAP.items():
+    if mapping.adapter:
+        sqlite3.register_adapter(t, mapping.adapter)
+    if mapping.converter:
+        sqlite3.register_converter(t.__name__, mapping.converter)
 
 
 class Tag(NamedTuple):
-    stuff_id: str
+    stuff_id: datetime
     tag: str
 
 
@@ -79,6 +109,18 @@ class Stuff(NamedTuple):
 
     def __repr__(self):
         return f"Stuff[{self[0]} -> {self.preview(length=20)}]"
+
+
+TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag}
+
+
+def create_cmd2(table_name: str, schema) -> str:
+    columns = []
+    for annotation in schema.__annotations__.items():
+        name = annotation[0]
+        sqlite_type = TYPE_MAP[annotation[1]].wire_type.value
+        columns.append(f"{name} {sqlite_type} NOT NULL")
+    return f"CREATE TABLE {table_name}({', '.join(columns)})"
 
 
 def add_command(sub_parsers, name, help, nargs=1):
@@ -130,7 +172,7 @@ def query_tags(con: Connection, tag, *, latest: bool = True) -> list[Tag]:
     order = "DESC" if latest else "ASC"
     with con:
         cur = con.execute(f"SELECT * FROM {TAGS} WHERE {TAG}=? "
-                          f"ORDER BY {ID} {order}", [tag])
+                          f"ORDER BY stuff_id {order}", [tag])
         return [Tag(*row) for row in cur.fetchall()]
 
 
@@ -143,7 +185,7 @@ def get_db(filename: str = DEFAULT_DB):
         logging.debug("Creating new, empty DB.")
         with sqlite3.connect(path) as con:
             for name, schema in TABLES.items():
-                con.execute(create_cmd(name, schema=schema))
+                con.execute(create_cmd2(name, schema))
             return con
 
 

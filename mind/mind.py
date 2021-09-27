@@ -14,6 +14,7 @@ ID = "id"
 BODY = "body"
 DEFAULT_DB = "~/.mind.db"
 DOTS = "..."
+NEWLINE = "\n"
 SPACE = " "
 STATE = "state"
 STUFF = "stuff"
@@ -132,16 +133,26 @@ def create_cmd2(table_name: str, schema) -> str:
 def add_command(sub_parsers, name, help, nargs=1):
     command = sub_parsers.add_parser(name)
     command.add_argument(name, type=str, nargs=nargs, help=help)
+    return command
 
 
 def setup(argv) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Hello! I'm here to mind your stuff for you.")
 
-    sub_parsers = parser.add_subparsers(help="Do '.. {cmd} -h' to get "
-                                             "help for subcommands.")
+    sub_parsers = parser.add_subparsers(dest="cmd",
+                                        help="Do '.. {cmd} -h' to; get help "\
+                                             "for subcommands.")
 
-    add_command(sub_parsers, Cmd.ADD.value, "Add stuff to mind.", nargs="+")
+    add = sub_parsers.add_parser(Cmd.ADD.value,
+                                 help="Add stuff to mind.")
+    add_group = add.add_mutually_exclusive_group()
+    add_group.add_argument("--file", type=str, help="Add stuff from a file.")
+    add_group.add_argument("-i", "--interactive", action="store_true",
+                           help="Add stuff interactively")
+    add_group.add_argument("-t", "--text",type=str,
+                           help="Add text from the command line")
+
     add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
     add_command(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
     add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
@@ -227,7 +238,7 @@ def extract_tags(raw_line: str):
     return SPACE.join(content), tags
 
 
-def new_stuff(hunks: list[str], joiner=SPACE) -> tuple[Stuff, set[str]]:
+def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, set[str]]:
     id = datetime.utcnow().isoformat()
     cleaned: list[str] = []
     all_tags: set[str] = set()
@@ -238,9 +249,10 @@ def new_stuff(hunks: list[str], joiner=SPACE) -> tuple[Stuff, set[str]]:
     return Stuff(id, joiner.join(cleaned), State.ACTIVE), all_tags
 
 
-def do_add(con: Connection, args: list[str]) -> list[str]:
-    logging.debug(f"Doing add: {args}")
-    stuff, tags = new_stuff(args)
+def do_add(con: Connection, content: list[str],
+           f_name: Optional[str] = None) -> list[str]:
+    logging.debug(f"Doing add: {content}")
+    stuff, tags = new_stuff(content)
     with con:
         con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)
         for tag in tags:
@@ -283,11 +295,21 @@ def do_tick(con: Connection, args: list[str]):
     return do_state_change(con, Cmd.TICK.name, args, State.TICKED)
 
 
+def add_content(args: argparse.Namespace) -> list[str]:
+    if args.text:
+        return [args.text]
+    elif args.file:
+        return Path(args.file).read_text().splitlines()
+    elif args.interactive:
+        raise NotImplementedError
+    else:
+        raise  NotImplementedError
+
 def run(args: argparse.Namespace) -> list[str]:
     logging.debug(f"Running with arguments: {args}")
     with get_db(args.db) as con:
-        if Cmd.ADD.value in args:
-            return do_add(con, args.add)
+        if args.cmd == Cmd.ADD.value:
+            return do_add(con, add_content(args))
         elif Cmd.LIST.value in args:
             return do_list(con, args=args.list)
         elif Cmd.FORGET.value in args:

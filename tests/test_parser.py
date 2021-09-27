@@ -19,3 +19,12 @@ class TestParser(unittest.TestCase):
         result = mind.setup(input)
         # Then
         self.assertListEqual(result.add, input[1:])
+
+    def test_add_file_extra_args(self):
+        # Given
+        input = ["add", "--file",  "foo.txt"]
+        # When
+        result = mind.setup(input)
+        # Then
+        #self.assertListEqual(result.add, [])
+        self.assertEqual(result.file, input[1])

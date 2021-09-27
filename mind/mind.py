@@ -126,50 +126,10 @@ class Stuff(NamedTuple):
 TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag}
 
 
-def create_cmd2(table_name: str, schema) -> str:
-    columns = []
-    for annotation in schema.__annotations__.items():
-        name = annotation[0]
-        sqlite_type = TYPE_MAP[annotation[1]].wire_type.value
-        columns.append(f"{name} {sqlite_type} NOT NULL")
-    return f"CREATE TABLE {table_name}({', '.join(columns)})"
-
-
 def add_command(sub_parsers, name, help, nargs=1):
     command = sub_parsers.add_parser(name)
     command.add_argument(name, type=str, nargs=nargs, help=help)
     return command
-
-
-def setup(argv) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Hello! I'm here to mind your stuff for you.")
-
-    sub_parsers = parser.add_subparsers(dest=CMD,
-                                        help="Do '.. {cmd} -h' to; get help "
-                                             "for subcommands.")
-
-    add = sub_parsers.add_parser(Cmd.ADD.value,
-                                 help="Add stuff to mind.")
-    add_group = add.add_mutually_exclusive_group()
-    add_group.add_argument("--file", type=str, help="Add stuff from a file.")
-    add_group.add_argument("-i", "--interactive", action="store_true",
-                           help="Add stuff interactively")
-    add_group.add_argument("-t", "--text", type=str,
-                           help="Add text from the command line")
-
-    add_command(sub_parsers, Cmd.SHOW.value, "Show stuff.")
-    add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
-    add_command(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
-    add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
-    add_command(sub_parsers, Cmd.CLEAN.value, nargs='?',
-                help="List your oldest stuff, so you can clean it up ;).")
-    parser.add_argument("--db", type=str, default=DEFAULT_DB,
-                        help=f"DB file, defaults to {DEFAULT_DB}")
-    parser.add_argument("-v", "--verbose",  action="store_true",
-                        help="Enable verbose output.")
-
-    return parser.parse_args(argv)
 
 
 def parse_item(args: list[str]) -> int:
@@ -212,9 +172,19 @@ def get_latest_tags(con: Connection, limit=15) -> list[Tag]:
         for row in cur.fetchall():
             tag = Tag(*row)
             latest[tag.tag] = tag
+        logging.debug(f"Found {len(latest)}")
         # Python dicts are now insertion sorted:
         # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
         return list(latest.values())[:limit]
+
+
+def build_create_table_cmd(table_name: str, schema) -> str:
+    columns = []
+    for annotation in schema.__annotations__.items():
+        name = annotation[0]
+        sqlite_type = TYPE_MAP[annotation[1]].wire_type.value
+        columns.append(f"{name} {sqlite_type} NOT NULL")
+    return f"CREATE TABLE {table_name}({', '.join(columns)})"
 
 
 def get_db(filename: str = DEFAULT_DB, strict: bool = False):
@@ -223,7 +193,7 @@ def get_db(filename: str = DEFAULT_DB, strict: bool = False):
     logging.debug(f"Opening DB {path}, exists: {path.exists()}")
     with sqlite3.connect(path) as con:
         for name, schema in TABLES.items():
-            create_cmd = create_cmd2(name, schema)
+            create_cmd = build_create_table_cmd(name, schema)
             if exists:
                 cur = con.execute("SELECT * FROM sqlite_master WHERE "
                                   "name=?", [name])
@@ -234,7 +204,7 @@ def get_db(filename: str = DEFAULT_DB, strict: bool = False):
                     if strict:
                         raise RuntimeError(msg)
                     else:
-                        logging.info(msg)
+                        logging.debug(msg)
             else:
                 con.execute(create_cmd)
         return con
@@ -359,6 +329,37 @@ def setup_logging(verbose: bool = False):
     lvl = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(level=lvl, format=fmt)
     logging.debug("Verbose logging enabled.")
+
+
+def setup(argv) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Hello! I'm here to mind your stuff for you.")
+
+    sub_parsers = parser.add_subparsers(dest=CMD,
+                                        help="Do '.. {cmd} -h' to; get help "
+                                             "for subcommands.")
+
+    add = sub_parsers.add_parser(Cmd.ADD.value,
+                                 help="Add stuff to mind.")
+    add_group = add.add_mutually_exclusive_group()
+    add_group.add_argument("--file", type=str, help="Add stuff from a file.")
+    add_group.add_argument("-i", "--interactive", action="store_true",
+                           help="Add stuff interactively")
+    add_group.add_argument("-t", "--text", type=str,
+                           help="Add text from the command line")
+
+    add_command(sub_parsers, Cmd.SHOW.value, "Show stuff.")
+    add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
+    add_command(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
+    add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
+    add_command(sub_parsers, Cmd.CLEAN.value, nargs='?',
+                help="List your oldest stuff, so you can clean it up ;).")
+    parser.add_argument("--db", type=str, default=DEFAULT_DB,
+                        help=f"DB file, defaults to {DEFAULT_DB}")
+    parser.add_argument("-v", "--verbose",  action="store_true",
+                        help="Enable verbose output.")
+
+    return parser.parse_args(argv)
 
 
 if __name__ == "__main__":

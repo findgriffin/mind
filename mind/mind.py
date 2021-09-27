@@ -28,6 +28,7 @@ NOT_NULL = "NOT NULL"
 PAGE_SIZE = 9
 PREVIEW_LENGTH = 40
 PRIMARY_KEY = " PRIMARY KEY "
+H_RULE = "--------------------------------"
 
 
 class Cmd(Enum):
@@ -108,8 +109,12 @@ class Stuff(NamedTuple):
         else:
             return "EMPTY BODY"
 
-    def show(self):
-        return f"Stuff [{self.human_id()}]\n--------\n{self.body}\n--------"
+    def show(self, tags=[]):
+        return NEWLINE.join([
+            f"Stuff [{self.human_id()}]", H_RULE,
+            "Tags: " + ", ".join([tag.tag for tag in tags]),
+            H_RULE, self.body
+        ])
 
     def __str__(self):
         return f"{self.human_id()} -> {self.preview()}"
@@ -191,6 +196,12 @@ def query_tags(con: Connection, tag, *, latest: bool = True) -> list[Tag]:
     with con:
         cur = con.execute(f"SELECT * FROM {TAGS} WHERE {TAG}=? "
                           f"ORDER BY {ID} {order}", [tag])
+        return [Tag(*row) for row in cur.fetchall()]
+
+
+def get_tags_for_stuff(con: Connection, id: str) -> list[Tag]:
+    with con:
+        cur = con.execute(f"SELECT * FROM {TAGS} WHERE {ID}=? ", [id])
         return [Tag(*row) for row in cur.fetchall()]
 
 
@@ -298,7 +309,8 @@ def do_tick(con: Connection, args: argparse.Namespace) -> list[str]:
 def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
     id = parse_item(args.show)
     rows = query_stuff(con, limit=1, start=id)
-    return [rows[0].show()]
+    tags = get_tags_for_stuff(con, rows[0].id)
+    return [rows[0].show(tags)]
 
 
 def do_add(con: Connection, args: argparse.Namespace) -> list[str]:

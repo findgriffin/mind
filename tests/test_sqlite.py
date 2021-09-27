@@ -29,10 +29,10 @@ class TestSQLite(unittest.TestCase):
     def test_add_and_query(self):
         # Given
         with mind.get_db(self.MEM) as con:
-            mind.do_add(con, ["one", "two", "three"])
+            mind.do_add(con, ["one"])
             fetched = mind.query_stuff(con)
             # Then
-            self.assertEqual(fetched[0][1], "one two three")
+            self.assertEqual(fetched[0][1], "one")
             now = datetime.utcnow()
             # Note: from https://docs.python.org/3/library/datetime.html
             #  > This does not support parsing arbitrary ISO 8601 strings

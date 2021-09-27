@@ -12,6 +12,7 @@ import sys
 
 ID = "id"
 BODY = "body"
+CMD = "cmd"
 DEFAULT_DB = "~/.mind.db"
 DOTS = "..."
 NEWLINE = "\n"
@@ -140,8 +141,8 @@ def setup(argv) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Hello! I'm here to mind your stuff for you.")
 
-    sub_parsers = parser.add_subparsers(dest="cmd",
-                                        help="Do '.. {cmd} -h' to; get help "\
+    sub_parsers = parser.add_subparsers(dest=CMD,
+                                        help="Do '.. {cmd} -h' to; get help "
                                              "for subcommands.")
 
     add = sub_parsers.add_parser(Cmd.ADD.value,
@@ -150,7 +151,7 @@ def setup(argv) -> argparse.Namespace:
     add_group.add_argument("--file", type=str, help="Add stuff from a file.")
     add_group.add_argument("-i", "--interactive", action="store_true",
                            help="Add stuff interactively")
-    add_group.add_argument("-t", "--text",type=str,
+    add_group.add_argument("-t", "--text", type=str,
                            help="Add text from the command line")
 
     add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
@@ -303,21 +304,25 @@ def add_content(args: argparse.Namespace) -> list[str]:
     elif args.interactive:
         raise NotImplementedError
     else:
-        raise  NotImplementedError
+        raise NotImplementedError
+
 
 def run(args: argparse.Namespace) -> list[str]:
     logging.debug(f"Running with arguments: {args}")
     with get_db(args.db) as con:
-        if args.cmd == Cmd.ADD.value:
-            return do_add(con, add_content(args))
-        elif Cmd.LIST.value in args:
-            return do_list(con, args=args.list)
-        elif Cmd.FORGET.value in args:
-            return do_forget(con, args.forget)
-        elif Cmd.TICK.value in args:
-            return do_tick(con, args.tick)
-        elif Cmd.CLEAN.value in args:
-            return do_list(con, args=args.clean, clean=True)
+        if CMD in args:
+            if args.cmd == Cmd.ADD.value:
+                return do_add(con, add_content(args))
+            elif Cmd.LIST.value in args:
+                return do_list(con, args=args.list)
+            elif Cmd.FORGET.value in args:
+                return do_forget(con, args.forget)
+            elif Cmd.TICK.value in args:
+                return do_tick(con, args.tick)
+            elif Cmd.CLEAN.value in args:
+                return do_list(con, args=args.clean, clean=True)
+            else:
+                raise ValueError("Unknown command " + args.cmd)
         else:
             return do_list(con)
     con.close()

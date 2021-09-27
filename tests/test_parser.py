@@ -1,4 +1,8 @@
 import unittest
+from argparse import Namespace
+from io import StringIO
+from unittest.mock import patch
+
 from mind import mind
 
 
@@ -14,17 +18,33 @@ class TestParser(unittest.TestCase):
 
     def test_parser_add(self):
         # Given
-        input = ["add", "my", "little", "pony"]
+        input = ["add", "-t", "my little pony"]
         # When
         result = mind.setup(input)
         # Then
-        self.assertListEqual(result.add, input[1:])
+        self.assertEqual(result.cmd, input[0])
 
-    def test_add_file_extra_args(self):
+    @patch('sys.stderr', new_callable=StringIO)
+    def test_parser_add_too_many(self, mock_stderr):
+        # Given
+        input = ["add", "my", "little", "pony"]
+        # When
+        with self.assertRaises(SystemExit) as context:
+            mind.setup(input)
+
+        self.assertEqual(2, context.exception.code)
+        self.assertTrue("unrecognized arguments" in mock_stderr.getvalue())
+
+    def test_add_file(self):
         # Given
         input = ["add", "--file",  "foo.txt"]
         # When
         result = mind.setup(input)
         # Then
-        #self.assertListEqual(result.add, [])
-        self.assertEqual(result.file, input[1])
+        self.assertEqual(result.cmd, input[0])
+        self.assertEqual(result.file, input[2])
+
+    def test_add_content_interactive(self):
+        with self.assertRaises(NotImplementedError):
+            namespace = Namespace(text=False, file=False, interactive=False)
+            mind.add_content(namespace)

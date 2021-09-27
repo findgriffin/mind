@@ -109,12 +109,12 @@ class Stuff(NamedTuple):
         else:
             return "EMPTY BODY"
 
-    def show(self, tags=[]):
-        return NEWLINE.join([
+    def show(self, tags=[]) -> list[str]:
+        return [
             f"Stuff [{self.human_id()}]", H_RULE,
             "Tags: " + ", ".join([tag.tag for tag in tags]),
             H_RULE, self.body
-        ])
+        ]
 
     def __str__(self):
         return f"{self.human_id()} -> {self.preview()}"
@@ -320,7 +320,7 @@ def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
     id = parse_item(args.show)
     rows = query_stuff(con, limit=1, start=id)
     tags = get_tags_for_stuff(con, rows[0].id)
-    return [rows[0].show(tags)]
+    return rows[0].show(tags)
 
 
 def do_add(con: Connection, args: argparse.Namespace) -> list[str]:

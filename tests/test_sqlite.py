@@ -153,5 +153,18 @@ class TestSQLite(unittest.TestCase):
             # Then
             self.assertListEqual(["Unable to find stuff: [1]"], output)
 
+    def test_show_success(self):
+        # Given
+        args = Namespace(show=["1"])
+        with mind.get_db(self.MEM) as con:
+            mind.do_add(con, Namespace(text="hello #something"))
+            # When
+            output = mind.do_show(con, args)
+            # Then
+            self.assertEqual(len(output), 5)
+            self.assertTrue("Stuff" in output[0])
+            self.assertEqual(output[2], "Tags: something")
+            self.assertEqual(output[4], "hello")
+
     def test_run(self):
         mind.run(Namespace(db=self.MEM, cmd=None))

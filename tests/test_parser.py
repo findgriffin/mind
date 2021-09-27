@@ -47,4 +47,4 @@ class TestParser(unittest.TestCase):
     def test_add_content_interactive(self):
         with self.assertRaises(NotImplementedError):
             namespace = Namespace(text=False, file=False, interactive=False)
-            mind.add_content(namespace)
+            mind.do_add(None, namespace)

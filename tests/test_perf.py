@@ -22,13 +22,13 @@ class TestPerf(unittest.TestCase):
             for i in range(1000):
                 letters = choices(ascii_letters, k=11)
                 tag = choices(digits, k=4)
-                mind.do_add(con, content=[f"{letters} #{tag}"])
+                mind.do_add_2(con, content=[f"{letters} #{tag}"])
 
         # When
         start = datetime.now()
         for i in range(200):
             with mind.get_db(db_name) as con:
-                mind.do_list(con, args=Namespace(cmd=None))
+                mind.do_list(con, Namespace(cmd=None))
         finish = datetime.now()
         os.remove(db_name)
 
@@ -47,7 +47,7 @@ class TestPerf(unittest.TestCase):
                 lines = [" ".join(
                     [word()] * randint(12, 16))] * randint(40, 100)
                 lines.append(" #".join([word()]) * randint(10, 15))
-                mind.do_add(con, content=lines)
+                mind.do_add_2(con, content=lines)
         finish = datetime.now()
         # File size: os.stat(db_name).st_size / 1024)
         os.remove(db_name)

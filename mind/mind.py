@@ -245,7 +245,7 @@ def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, set[str]]:
     return Stuff(id, joiner.join(cleaned), State.ACTIVE), all_tags
 
 
-def do_add(con: Connection, content: list[str]) -> list[str]:
+def do_add_2(con: Connection, content: list[str]) -> list[str]:
     logging.debug(f"Doing add: {content}")
     stuff, tags = new_stuff(content)
     with con:
@@ -255,7 +255,7 @@ def do_add(con: Connection, content: list[str]) -> list[str]:
     return [f"Added {stuff}"]
 
 
-def do_list(con: Connection, *, args: argparse.Namespace) -> list[str]:
+def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
     output = ["Currently minding..."]
     latest = CMD not in args or args.cmd != Cmd.CLEAN.value
     fetched = query_stuff(con, latest=latest)
@@ -282,19 +282,19 @@ def do_state_change(con: Connection, name: str,
         raise RuntimeError(f"Query for 1 row returned {len(stuff)} rows.")
 
 
-def do_forget(con: Connection, args: list[str]):
-    return do_state_change(con, Cmd.FORGET.name, args, State.FORGOTTEN)
+def do_forget(con: Connection, args: argparse.Namespace):
+    return do_state_change(con, Cmd.FORGET.name, args.forget, State.FORGOTTEN)
 
 
-def do_tick(con: Connection, args: list[str]):
-    return do_state_change(con, Cmd.TICK.name, args, State.TICKED)
+def do_tick(con: Connection, args: argparse.Namespace):
+    return do_state_change(con, Cmd.TICK.name, args.tick, State.TICKED)
 
 
-def add_content(args: argparse.Namespace) -> list[str]:
+def do_add(con: Connection, args: argparse.Namespace) -> list[str]:
     if args.text:
-        return [args.text]
+        return do_add_2(con, [args.text])
     elif args.file:
-        return Path(args.file).read_text().splitlines()
+        return do_add_2(con, Path(args.file).read_text().splitlines())
     elif args.interactive:
         raise NotImplementedError
     else:
@@ -305,17 +305,17 @@ def run(args: argparse.Namespace) -> list[str]:
     logging.debug(f"Running with arguments: {args}")
     with get_db(args.db) as con:
         if args.cmd == Cmd.ADD.value:
-            return do_add(con, add_content(args))
+            return do_add(con, args)
         elif Cmd.LIST.value in args:
-            return do_list(con, args=args)
+            return do_list(con, args)
         elif Cmd.FORGET.value in args:
-            return do_forget(con, args.forget)
+            return do_forget(con, args)
         elif Cmd.TICK.value in args:
-            return do_tick(con, args.tick)
+            return do_tick(con, args)
         elif Cmd.CLEAN.value in args:
-            return do_list(con, args=args)
+            return do_list(con, args)
         else:
-            return do_list(con, args=args)
+            return do_list(con, args)
     con.close()
 
 

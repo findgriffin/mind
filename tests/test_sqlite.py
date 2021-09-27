@@ -29,7 +29,7 @@ class TestSQLite(unittest.TestCase):
     def test_add_and_query(self):
         # Given
         with mind.get_db(self.MEM) as con:
-            mind.do_add(con, ["one"])
+            mind.do_add_2(con, ["one"])
             fetched = mind.query_stuff(con)
             # Then
             self.assertEqual(fetched[0][1], "one")
@@ -46,7 +46,7 @@ class TestSQLite(unittest.TestCase):
         with mind.get_db(self.MEM) as con:
             for i in range(20):
                 sleep(0.03)
-                mind.do_add(con, f"entry {i}")
+                mind.do_add_2(con, f"entry {i}")
             # Then
             fetched = mind.query_stuff(con)
             self.assertEqual(10, len(fetched))
@@ -56,8 +56,8 @@ class TestSQLite(unittest.TestCase):
 
     def test_update_no_entries(self):
         with mind.get_db(self.MEM) as con:
-            mind.do_add(con, ["some stuff!!"])
-            mind.do_add(con, ["some more stuff!!"])
+            mind.do_add_2(con, ["some stuff!!"])
+            mind.do_add_2(con, ["some more stuff!!"])
             active_before = mind.query_stuff(con)
             self.assertEqual(2, len(active_before))
             mind.update_state(con, 1, mind.State.TICKED)
@@ -68,13 +68,13 @@ class TestSQLite(unittest.TestCase):
 
     def test_add_with_tags(self):
         with mind.get_db(self.MEM) as con:
-            mind.do_add(con, ["some stuff!!! #stuff"])
+            mind.do_add_2(con, ["some stuff!!! #stuff"])
             sleep(.02)
-            mind.do_add(con, ["more stuff!!! #thing"])
+            mind.do_add_2(con, ["more stuff!!! #thing"])
             sleep(.02)
-            mind.do_add(con, ["less stuff??? #hello"])
+            mind.do_add_2(con, ["less stuff??? #hello"])
             sleep(.02)
-            mind.do_add(con, ["less stuff??? #thing"])
+            mind.do_add_2(con, ["less stuff??? #thing"])
             thing = mind.query_tags(con, "thing")
             self.assertGreater(thing[0][0], thing[1][0])
             self.assertEqual(thing[0][1], "thing")
@@ -89,7 +89,7 @@ class TestSQLite(unittest.TestCase):
         with mind.get_db(self.MEM) as con:
             for i in range(inserted_rows):
                 letters = random.choices(string.ascii_letters, k=11)
-                mind.do_add(con, [f"{letters} #{i % inserted_tags}"])
+                mind.do_add_2(con, [f"{letters} #{i % inserted_tags}"])
                 sleep(.005)
             # When
             output = mind.get_latest_tags(con)
@@ -100,7 +100,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_do_list_empty(self):
         with mind.get_db(self.MEM) as con:
-            mind.do_list(con, args=Namespace(cmd=None))
+            mind.do_list(con, Namespace(cmd=None))
 
     def test_blank_db(self):
         with mind.get_db(Path("tests/data/blank.db")) as con:
@@ -109,9 +109,9 @@ class TestSQLite(unittest.TestCase):
 
     def test_forget_success(self):
         # Given
-        args = ["1"]
+        args = Namespace(forget=["1"])
         with mind.get_db(self.MEM) as con:
-            mind.do_add(con, ["some content"])
+            mind.do_add_2(con, ["some content"])
             # When
             output = mind.do_forget(con, args)
             # Then
@@ -121,7 +121,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_forget_when_empty(self):
         # Given
-        args = ["1"]
+        args = Namespace(forget=["1"])
         with mind.get_db(self.MEM) as con:
             # When
             output = mind.do_forget(con, args)
@@ -130,7 +130,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_forget_tag_indexed(self):
         # Given
-        args = ["#tag.1"]
+        args = Namespace(forget=["#tag.1"])
         with mind.get_db(self.MEM) as con:
             # When
             with self.assertRaises(NotImplementedError):
@@ -138,7 +138,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_tick_multiple_args(self):
         # Given
-        args = ["#tag.1", "wot"]
+        args = Namespace(tick=["#tag.1", "wot"])
         with mind.get_db(self.MEM) as con:
             # When
             with self.assertRaises(NotImplementedError):
@@ -146,7 +146,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_tick_empty_db(self):
         # Given
-        args = ["1"]
+        args = Namespace(tick=["1"])
         with mind.get_db(self.MEM) as con:
             # When
             output = mind.do_tick(con, args)

@@ -35,6 +35,7 @@ class Cmd(Enum):
     CLEAN = "clean"
     FORGET = "forget"
     LIST = "list"
+    SHOW = "show"
     TICK = "tick"
 
 
@@ -107,6 +108,9 @@ class Stuff(NamedTuple):
         else:
             return "EMPTY BODY"
 
+    def show(self):
+        return f"Stuff [{self.human_id()}]\n--------\n{self.body}\n--------"
+
     def __str__(self):
         return f"{self.human_id()} -> {self.preview()}"
 
@@ -149,6 +153,7 @@ def setup(argv) -> argparse.Namespace:
     add_group.add_argument("-t", "--text", type=str,
                            help="Add text from the command line")
 
+    add_command(sub_parsers, Cmd.SHOW.value, "Show stuff.")
     add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
     add_command(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
     add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
@@ -282,12 +287,18 @@ def do_state_change(con: Connection, name: str,
         raise RuntimeError(f"Query for 1 row returned {len(stuff)} rows.")
 
 
-def do_forget(con: Connection, args: argparse.Namespace):
+def do_forget(con: Connection, args: argparse.Namespace) -> list[str]:
     return do_state_change(con, Cmd.FORGET.name, args.forget, State.FORGOTTEN)
 
 
-def do_tick(con: Connection, args: argparse.Namespace):
+def do_tick(con: Connection, args: argparse.Namespace) -> list[str]:
     return do_state_change(con, Cmd.TICK.name, args.tick, State.TICKED)
+
+
+def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
+    id = parse_item(args.show)
+    rows = query_stuff(con, limit=1, start=id)
+    return [rows[0].show()]
 
 
 def do_add(con: Connection, args: argparse.Namespace) -> list[str]:
@@ -305,6 +316,7 @@ COMMANDS = {
     "add": do_add,
     "list": do_list,
     "forget": do_forget,
+    "show": do_show,
     "tick": do_tick,
     "clean": do_list
 }

@@ -39,6 +39,12 @@ class State(Enum):
     TICKED = 1
     FORGOTTEN = 2
 
+    def __str__(self):
+        return f"{self.name}"
+
+    def __repr__(self):
+        return f"{self.name}({self.value})"
+
 
 class SQLiteType(Enum):
     NULL = "NULL"
@@ -86,8 +92,8 @@ class Tag(NamedTuple):
 
 
 def sqlite_execute(con: Connection, sql: str, params: dict) -> Cursor:
-    logging.debug(f"Executing {sql} params:{params} (isolation:"
-                  f"{con.isolation_level}, in_tx:{con.in_transaction})")
+    logging.debug(f"Executing SQL   :{sql}")
+    logging.debug(f"Executing PARAMS:{params}")
     with con:
         return con.execute(sql, params)
 
@@ -165,22 +171,18 @@ class QueryStuff(NamedTuple):
         return SPACE.join(parts)
 
     def execute(self, con: Connection) -> list[Stuff]:
-        with con:
-            cur = con.execute(self.cmd(), self._asdict())
-            return [Stuff(*row) for row in cur.fetchall()]
+        cur = sqlite_execute(con, self.cmd(), self._asdict())
+        return [Stuff(*row) for row in cur.fetchall()]
 
 
-def query_tags(con: Connection, tag, *, latest: bool = True) -> list[Tag]:
-    order = "DESC" if latest else "ASC"
-    with con:
-        cur = con.execute(f"SELECT * FROM {TAGS} WHERE {TAG}=? "
-                          f"ORDER BY {ID} {order}", [tag])
-        return [Tag(*row) for row in cur.fetchall()]
+class QueryTags(NamedTuple):
+    id: str
 
+    def cmd(self):
+        return "SELECT id, tag FROM tags WHERE id=:id"
 
-def get_tags_for_stuff(con: Connection, id: str) -> list[Tag]:
-    with con:
-        cur = con.execute(f"SELECT * FROM {TAGS} WHERE {ID}=? ", [id])
+    def execute(self, con: Connection) -> list[Tag]:
+        cur = sqlite_execute(con, self.cmd(), self._asdict())
         return [Tag(*row) for row in cur.fetchall()]
 
 
@@ -320,7 +322,7 @@ def do_tick(con: Connection, args: argparse.Namespace) -> list[str]:
 def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
     id = parse_item(args.show)
     rows = QueryStuff(limit=1, offset=id-1).execute(con)
-    tags = get_tags_for_stuff(con, rows[0].id)
+    tags = QueryTags(id=rows[0].id).execute(con)
     return rows[0].show(tags)
 
 

@@ -75,10 +75,9 @@ class TestSQLite(unittest.TestCase):
             mind.add_content(con, ["less stuff??? #hello"])
             sleep(.02)
             mind.add_content(con, ["less stuff??? #thing"])
-            thing = mind.query_tags(con, "thing")
-            self.assertGreater(thing[0][0], thing[1][0])
-            self.assertEqual(thing[0][1], "thing")
-            self.assertEqual(thing[1][1], "thing")
+            latest = mind.get_latest_tags(con)
+            self.assertListEqual([tag.tag for tag in latest],
+                                 ["thing", "hello", "stuff"])
         con.close()
 
     def test_get_lots_of_tags(self):

@@ -134,23 +134,43 @@ def parse_item(args: list[str]) -> int:
         raise NotImplementedError("Only numbered items currently supported.")
 
 
+class QueryStuff(NamedTuple):
+    latest: bool = True
+    limit: int = PAGE_SIZE + 1
+    offset: int = 0
+    state: State = State.ACTIVE
+    tag: Optional[str] = None
+
+    def order(self) -> str:
+        return "DESC" if self.latest else "ASC"
+
+    def cmd(self):
+        parts = ["SELECT stuff.id, stuff.body FROM stuff"]
+        if self.tag:
+            parts.append("INNER JOIN tags ON stuff.id = tags.id ")
+            parts.append("WHERE tags.tag = :tag")
+            if self.state:
+                parts.append("AND stuff.state = :state")
+        else:
+            if self.state:
+                parts.append("WHERE stuff.state = :state")
+        parts.append("ORDER BY stuff.id LIMIT :limit OFFSET :offset")
+        return SPACE.join(parts)
+
+
 def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
                 limit: int = PAGE_SIZE+1, start: int = 1) -> list[Stuff]:
     order = "DESC" if latest else "ASC"
     with con:
         cur = con.execute(f"SELECT * FROM {STUFF} WHERE stuff.state= :state "
                           f"ORDER BY {ID} {order} LIMIT {limit} "
-                          f"OFFSET {start-1}", {"state": state.value})
+                          f"OFFSET {start-1}", {"state": state})
         return [Stuff(*row) for row in cur.fetchall()]
 
 
-def query_stuff_by_tag(con, tag, latest=True):
-    order = "DESC" if latest else "ASC"
-    cmd = "SELECT stuff.id, stuff.body FROM stuff INNER JOIN tags ON " \
-          "stuff.id = tags.id WHERE tags.tag = :tag AND stuff.state = :state "\
-          f"ORDER BY stuff.id {order} LIMIT 10 OFFSET 0"
+def query_stuff_by_tag(con, query: QueryStuff):
     with con:
-        cur = con.execute(cmd, {"tag": tag, "state": 0})
+        cur = con.execute(query.cmd(), query._asdict())
         return [Stuff(*row) for row in cur.fetchall()]
 
 
@@ -276,7 +296,8 @@ def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
     if filter:
         parsed = parse_filter(filter)
         filter_desc = "=".join(parsed)
-        fetched = query_stuff_by_tag(con, parsed[1], latest=latest)
+        query = QueryStuff(latest=latest, tag=parsed[1])
+        fetched = query_stuff_by_tag(con, query)
     else:
         fetched = query_stuff(con, latest=latest)
     noun = "latest" if latest else "oldest"

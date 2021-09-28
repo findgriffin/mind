@@ -191,6 +191,8 @@ class TestSQLite(unittest.TestCase):
             self.assertSetEqual(set(tag_0_set) & set(tag_1_set), set())
 
             union = excluded_set.union(tag_0_set).union(tag_1_set)
+            self.assertEqual(len(tag_0_set), 9)
+            self.assertEqual(len(tag_1_set), 9)
             self.assertEqual(len(union), 26)
 
     def test_run(self):

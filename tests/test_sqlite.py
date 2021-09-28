@@ -166,5 +166,32 @@ class TestSQLite(unittest.TestCase):
             self.assertEqual(output[2], "Tags: something")
             self.assertEqual(output[4], "hello")
 
+    def test_filtered_list(self):
+        # Given
+        sep = ":::"
+        original_entries = 30
+        with mind.get_db(self.MEM) as con:
+            for i in range(original_entries):
+                mind.do_add(con, Namespace(text=f"Entry{sep}{i+1} #{i % 2}"))
+            excluded = []
+            for i in range(4):
+                excluded.append(mind.do_tick(con, Namespace(tick=f"{2}"))[0])
+                excluded.append(mind.do_forget(con,
+                                               Namespace(forget=f"{2}"))[0])
+            # When
+            tag_0 = mind.do_list(con, Namespace(list="0"))
+            tag_1 = mind.do_list(con, Namespace(list="1"))
+
+            excluded_set = set([text.split(sep)[-1] for text in excluded])
+            tag_0_set = set([text.split(sep)[-1] for text in tag_0[1:-2]])
+            tag_1_set = set([text.split(sep)[-1] for text in tag_1[1:-2]])
+
+            self.assertSetEqual(set(excluded_set) & set(tag_0_set), set())
+            self.assertSetEqual(set(excluded_set) & set(tag_1_set), set())
+            self.assertSetEqual(set(tag_0_set) & set(tag_1_set), set())
+
+            union = excluded_set.union(tag_0_set).union(tag_1_set)
+            self.assertEqual(len(union), 26)
+
     def test_run(self):
         mind.run(Namespace(db=self.MEM, cmd=None))

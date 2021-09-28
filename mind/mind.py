@@ -144,6 +144,16 @@ def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
         return [Stuff(*row) for row in cur.fetchall()]
 
 
+def query_stuff_by_tag(con, tag, latest=True):
+    order = "DESC" if latest else "ASC"
+    cmd = "SELECT stuff.id, stuff.body FROM stuff INNER JOIN tags ON " \
+          "stuff.id = tags.id WHERE tags.tag = ? AND stuff.state = ? " \
+          f"ORDER BY stuff.id {order} LIMIT 10"
+    with con:
+        cur = con.execute(cmd, (tag, 0))
+        return [Stuff(*row) for row in cur.fetchall()]
+
+
 def query_tags(con: Connection, tag, *, latest: bool = True) -> list[Tag]:
     order = "DESC" if latest else "ASC"
     with con:
@@ -240,11 +250,37 @@ def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, set[str]]:
     return Stuff(id, joiner.join(cleaned), State.ACTIVE), all_tags
 
 
-def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
+# Always returns lowercase
+def parse_filter(arg: str):
+    if arg.isalnum():
+        return (TAG, arg.lower())
+    elif arg.startswith(TAG_PREFIX):
+        return (TAG, arg[1:].lower())
+    else:
+        raise ValueError(f"Unknown filter: {arg}")
+
+
+def order_and_filter(args: argparse.Namespace) -> tuple[bool, Optional[str]]:
     latest = CMD not in args or args.cmd != Cmd.CLEAN.value
+    try:
+        filter = args.list if latest else args.clean
+        return latest, filter
+    except AttributeError:
+        return latest, None
+
+
+def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
+    latest, filter = order_and_filter(args)
+    logging.debug(f"Listing latest: {latest} filter: {filter}")
+    filter_desc = "ALL"
+    if filter:
+        parsed = parse_filter(filter)
+        filter_desc = "=".join(parsed)
+        fetched = query_stuff_by_tag(con, parsed[1], latest=latest)
+    else:
+        fetched = query_stuff(con, latest=latest)
     noun = "latest" if latest else "oldest"
-    output = [f"Currently minding {noun} stuff..."]
-    fetched = query_stuff(con, latest=latest)
+    output = [f"Currently minding {noun} [{filter_desc}]..."]
     for index, row in enumerate(fetched[:PAGE_SIZE], 1):
         output.append(f" {index}. {row}")
     if len(fetched) > PAGE_SIZE:
@@ -348,7 +384,8 @@ def setup(argv) -> argparse.Namespace:
 
     add_command(sub_parsers, Cmd.SHOW.value, "Show stuff.")
     add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
-    add_command(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
+    add_command(sub_parsers, Cmd.LIST.value, nargs="?",
+                help="List your latest stuff.")
     add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
     add_command(sub_parsers, Cmd.CLEAN.value, nargs='?',
                 help="List your oldest stuff, so you can clean it up ;).")

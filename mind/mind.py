@@ -138,19 +138,19 @@ def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
                 limit: int = PAGE_SIZE+1, start: int = 1) -> list[Stuff]:
     order = "DESC" if latest else "ASC"
     with con:
-        cur = con.execute(f"SELECT * FROM {STUFF} WHERE state={state.value} "
+        cur = con.execute(f"SELECT * FROM {STUFF} WHERE stuff.state= :state "
                           f"ORDER BY {ID} {order} LIMIT {limit} "
-                          f"OFFSET {start-1}")
+                          f"OFFSET {start-1}", {"state": state.value})
         return [Stuff(*row) for row in cur.fetchall()]
 
 
 def query_stuff_by_tag(con, tag, latest=True):
     order = "DESC" if latest else "ASC"
     cmd = "SELECT stuff.id, stuff.body FROM stuff INNER JOIN tags ON " \
-          "stuff.id = tags.id WHERE tags.tag = ? AND stuff.state = ? " \
-          f"ORDER BY stuff.id {order} LIMIT 10"
+          "stuff.id = tags.id WHERE tags.tag = :tag AND stuff.state = :state "\
+          f"ORDER BY stuff.id {order} LIMIT 10 OFFSET 0"
     with con:
-        cur = con.execute(cmd, (tag, 0))
+        cur = con.execute(cmd, {"tag": tag, "state": 0})
         return [Stuff(*row) for row in cur.fetchall()]
 
 

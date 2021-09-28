@@ -22,12 +22,7 @@ STUFF = "stuff"
 TAG = "tag"
 TAGS = "tags"
 TAG_PREFIX = "#"
-TEXT = "TEXT"
-INTEGER = "INTEGER"
-NOT_NULL = "NOT NULL"
 PAGE_SIZE = 9
-PRIMARY_KEY = " PRIMARY KEY "
-H_RULE = "--------------------------------"
 
 
 class Cmd(Enum):
@@ -103,11 +98,11 @@ class Stuff(NamedTuple):
                        placeholder=" ...") if self.body else "EMPTY"
 
     def show(self, tags=[]) -> list[str]:
-        return [
-            f"Stuff [{self.human_id()}]", H_RULE,
-            "Tags: " + ", ".join([tag.tag for tag in tags]),
-            H_RULE, self.body
-        ]
+        h_rule = "-" * 32
+        tag_names = [tag.tag for tag in tags]
+        tag_names.sort()
+        return [f"Stuff [{self.human_id()}]", h_rule,
+                "Tags: " + ", ".join(tag_names), h_rule, self.body]
 
     def __str__(self):
         return f"{self.human_id()} -> {self.preview()}"

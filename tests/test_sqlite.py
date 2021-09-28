@@ -30,7 +30,7 @@ class TestSQLite(unittest.TestCase):
         # Given
         with mind.get_db(self.MEM) as con:
             mind.add_content(con, ["one"])
-            fetched = mind.query_stuff(con)
+            fetched = mind.QueryStuff().execute(con)
             # Then
             self.assertEqual(fetched[0][1], "one")
             now = datetime.utcnow()
@@ -48,7 +48,7 @@ class TestSQLite(unittest.TestCase):
                 sleep(0.03)
                 mind.add_content(con, [f"entry {i}"])
             # Then
-            fetched = mind.query_stuff(con)
+            fetched = mind.QueryStuff().execute(con)
             self.assertEqual(10, len(fetched))
             self.assertGreater(fromiso(fetched[0][0]),
                                fromiso(fetched[-1][0]))
@@ -58,10 +58,10 @@ class TestSQLite(unittest.TestCase):
         with mind.get_db(self.MEM) as con:
             mind.add_content(con, ["some stuff!!"])
             mind.add_content(con, ["some more stuff!!"])
-            active_before = mind.query_stuff(con)
+            active_before = mind.QueryStuff().execute(con)
             self.assertEqual(2, len(active_before))
             mind.update_state(con, 1, mind.State.TICKED)
-            active_after = mind.query_stuff(con)
+            active_after = mind.QueryStuff().execute(con)
             self.assertEqual(1, len(active_after))
             self.assertNotIn("more", active_after[0][1])
         con.close()
@@ -104,7 +104,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_blank_db(self):
         with mind.get_db(Path("tests/data/blank.db")) as con:
-            mind.query_stuff(con)
+            mind.QueryStuff().execute(con)
         con.close()
 
     def test_forget_success(self):

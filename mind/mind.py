@@ -154,24 +154,14 @@ class QueryStuff(NamedTuple):
         else:
             if self.state:
                 parts.append("WHERE stuff.state = :state")
-        parts.append("ORDER BY stuff.id LIMIT :limit OFFSET :offset")
+        parts.append(f"ORDER BY stuff.id {self.order()}")
+        parts.append("LIMIT :limit OFFSET :offset")
         return SPACE.join(parts)
 
-
-def query_stuff(con: Connection, *, state=State.ACTIVE, latest: bool = True,
-                limit: int = PAGE_SIZE+1, start: int = 1) -> list[Stuff]:
-    order = "DESC" if latest else "ASC"
-    with con:
-        cur = con.execute(f"SELECT * FROM {STUFF} WHERE stuff.state= :state "
-                          f"ORDER BY {ID} {order} LIMIT {limit} "
-                          f"OFFSET {start-1}", {"state": state})
-        return [Stuff(*row) for row in cur.fetchall()]
-
-
-def query_stuff_by_tag(con, query: QueryStuff):
-    with con:
-        cur = con.execute(query.cmd(), query._asdict())
-        return [Stuff(*row) for row in cur.fetchall()]
+    def execute(self, con: Connection) -> list[Stuff]:
+        with con:
+            cur = con.execute(self.cmd(), self._asdict())
+            return [Stuff(*row) for row in cur.fetchall()]
 
 
 def query_tags(con: Connection, tag, *, latest: bool = True) -> list[Tag]:
@@ -234,7 +224,7 @@ def get_db(filename: str = DEFAULT_DB, strict: bool = False):
 
 
 def update_state(con, num: int, new_state: State):
-    active = query_stuff(con, limit=1, start=num)
+    active = QueryStuff(limit=1, offset=num-1).execute(con)
     id = active[0][0]
     update = f"UPDATE {STUFF} SET {STATE}={new_state.value} WHERE id=?"
     logging.debug(f"Executing.. {update}, id={id}")
@@ -296,10 +286,9 @@ def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
     if filter:
         parsed = parse_filter(filter)
         filter_desc = "=".join(parsed)
-        query = QueryStuff(latest=latest, tag=parsed[1])
-        fetched = query_stuff_by_tag(con, query)
+        fetched = QueryStuff(latest=latest, tag=parsed[1]).execute(con)
     else:
-        fetched = query_stuff(con, latest=latest)
+        fetched = QueryStuff(latest=latest).execute(con)
     noun = "latest" if latest else "oldest"
     output = [f"Currently minding {noun} [{filter_desc}]..."]
     for index, row in enumerate(fetched[:PAGE_SIZE], 1):
@@ -313,7 +302,7 @@ def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
 def do_state_change(con: Connection, name: str,
                     args: list[str], state: State) -> list[str]:
     id = parse_item(args)
-    stuff = query_stuff(con, limit=1, start=id)
+    stuff = QueryStuff(limit=1, offset=id-1).execute(con)
     if len(stuff) == 1:
         update_state(con, id, state)
         return [f"{state.name.capitalize()}: {stuff[0]}"]
@@ -333,7 +322,7 @@ def do_tick(con: Connection, args: argparse.Namespace) -> list[str]:
 
 def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
     id = parse_item(args.show)
-    rows = query_stuff(con, limit=1, start=id)
+    rows = QueryStuff(limit=1, offset=id-1).execute(con)
     tags = get_tags_for_stuff(con, rows[0].id)
     return rows[0].show(tags)
 

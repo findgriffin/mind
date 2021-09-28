@@ -31,6 +31,7 @@ class Cmd(Enum):
     ADD = "add"
     CLEAN = "clean"
     FORGET = "forget"
+    HISTORY = "history"
     LIST = "list"
     SHOW = "show"
     TICK = "tick"
@@ -317,6 +318,10 @@ def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
     return rows[0].show(tags)
 
 
+def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
+    return ["Not implemented yet."]
+
+
 def add_content(con: Connection, content: list[str]) -> list[str]:
     logging.debug(f"Doing add: {content}")
     stuff, tags = new_stuff(content)
@@ -340,11 +345,12 @@ def do_add(con: Connection, args: argparse.Namespace) -> list[str]:
 
 COMMANDS = {
     "add": do_add,
-    "list": do_list,
+    "clean": do_list,
     "forget": do_forget,
+    "history": do_history,
+    "list": do_list,
     "show": do_show,
     "tick": do_tick,
-    "clean": do_list
 }
 
 
@@ -381,20 +387,19 @@ def add_list_cmd(sub_parsers, name, help):
 def setup(argv) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Hello! I'm here to mind your stuff for you.")
-    sub_parsers = parser.add_subparsers(dest=CMD,
-                                        help="Do '.. {cmd} -h' to; get help "
-                                             "for subcommands.")
-    add = sub_parsers.add_parser(Cmd.ADD.value,
-                                 help="Add stuff to mind.")
+    sub_parsers = parser.add_subparsers(
+        dest=CMD, help="Do '.. {cmd} -h' to; get help for subcommands.")
+    add = sub_parsers.add_parser(Cmd.ADD.value, help="Add stuff to mind.")
     add_group = add.add_mutually_exclusive_group()
     add_group.add_argument("--file", type=str, help="Add stuff from a file.")
     add_group.add_argument("-i", "--interactive", action="store_true",
-                           help="Add stuff interactively")
+                           help="Add stuff interactively.")
     add_group.add_argument("-t", "--text", type=str,
                            help="Add text from the command line")
+    add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
     add_command(sub_parsers, Cmd.SHOW.value, "Show stuff.")
     add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
-    add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
+    add_list_cmd(sub_parsers, Cmd.HISTORY.value, "Show history of changes.")
     add_list_cmd(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
     add_list_cmd(sub_parsers, Cmd.CLEAN.value,
                  "List your oldest stuff, so you can clean it up ;).")
@@ -402,7 +407,6 @@ def setup(argv) -> argparse.Namespace:
                         help=f"DB file, defaults to {DEFAULT_DB}")
     parser.add_argument("-v", "--verbose",  action="store_true",
                         help="Enable verbose output.")
-
     return parser.parse_args(argv)
 
 

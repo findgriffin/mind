@@ -2,7 +2,7 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from sqlite3 import Connection
+from sqlite3 import Connection, Cursor
 from textwrap import wrap, shorten
 from typing import NamedTuple, Callable, Optional
 import argparse
@@ -85,6 +85,13 @@ class Tag(NamedTuple):
     tag: str
 
 
+def sqlite_execute(con: Connection, sql: str, params: dict) -> Cursor:
+    logging.debug(f"Executing {sql} params:{params} (isolation:"
+                  f"{con.isolation_level}, in_tx:{con.in_transaction})")
+    with con:
+        return con.execute(sql, params)
+
+
 class Stuff(NamedTuple):
     id: str
     body: str
@@ -109,6 +116,10 @@ class Stuff(NamedTuple):
 
     def __repr__(self):
         return f"Stuff[{self.id} -> {self.preview(width=20)}]"
+
+    def update_state(self, con, new_state) -> None:
+        sql = "UPDATE stuff SET state=:state WHERE id=:id"
+        sqlite_execute(con, sql, {"id": self.id, "state": new_state})
 
 
 TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag}
@@ -218,15 +229,6 @@ def get_db(filename: str = DEFAULT_DB, strict: bool = False):
         return con
 
 
-def update_state(con, num: int, new_state: State):
-    active = QueryStuff(limit=1, offset=num-1).execute(con)
-    id = active[0][0]
-    update = f"UPDATE {STUFF} SET {STATE}={new_state.value} WHERE id=?"
-    logging.debug(f"Executing.. {update}, id={id}")
-    with con:
-        con.execute(update, [id])
-
-
 def is_tag(word: str) -> Optional[str]:
     if len(word) > 1 and word.startswith(TAG_PREFIX):
         candidate = word[1:]
@@ -294,12 +296,12 @@ def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
     return output + wrap(f"Latest tags: {tags}")
 
 
-def do_state_change(con: Connection, name: str,
-                    args: list[str], state: State) -> list[str]:
+def do_state_change(con: Connection, args: list[str],
+                    state: State) -> list[str]:
     id = parse_item(args)
     stuff = QueryStuff(limit=1, offset=id-1).execute(con)
     if len(stuff) == 1:
-        update_state(con, id, state)
+        stuff[0].update_state(con, state)
         return [f"{state.name.capitalize()}: {stuff[0]}"]
     elif len(stuff) == 0:
         return([f"Unable to find stuff: [{id}]"])
@@ -308,11 +310,11 @@ def do_state_change(con: Connection, name: str,
 
 
 def do_forget(con: Connection, args: argparse.Namespace) -> list[str]:
-    return do_state_change(con, Cmd.FORGET.name, args.forget, State.FORGOTTEN)
+    return do_state_change(con, args.forget, State.FORGOTTEN)
 
 
 def do_tick(con: Connection, args: argparse.Namespace) -> list[str]:
-    return do_state_change(con, Cmd.TICK.name, args.tick, State.TICKED)
+    return do_state_change(con, args.tick, State.TICKED)
 
 
 def do_show(con: Connection, args: argparse.Namespace) -> list[str]:

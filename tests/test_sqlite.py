@@ -54,13 +54,13 @@ class TestSQLite(unittest.TestCase):
                                fromiso(fetched[-1][0]))
         con.close()
 
-    def test_update_no_entries(self):
+    def test_update_correct_entry(self):
         with mind.get_db(self.MEM) as con:
             mind.add_content(con, ["some stuff!!"])
             mind.add_content(con, ["some more stuff!!"])
             active_before = mind.QueryStuff().execute(con)
             self.assertEqual(2, len(active_before))
-            mind.update_state(con, 1, mind.State.TICKED)
+            mind.do_state_change(con, ["1"], mind.State.TICKED)
             active_after = mind.QueryStuff().execute(con)
             self.assertEqual(1, len(active_after))
             self.assertNotIn("more", active_after[0][1])

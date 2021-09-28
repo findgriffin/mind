@@ -27,7 +27,7 @@ class TestPerf(unittest.TestCase):
             # When
             start = datetime.now()
             for i in range(200):
-                mind.do_list(con, Namespace(cmd=None))
+                mind.do_list(con, Namespace(cmd=None, num=50))
         con.close()
         finish = datetime.now()
         os.remove(db_path)

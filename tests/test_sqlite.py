@@ -98,8 +98,12 @@ class TestSQLite(unittest.TestCase):
                 self.assertEqual(tag.tag, str(i % inserted_tags))
 
     def test_do_list_empty(self):
+        # Given
         with mind.get_db(self.MEM) as con:
-            mind.do_list(con, Namespace(cmd=None))
+            # When
+            output = mind.do_list(con, Namespace(cmd=None, num=1000))
+            # Then
+            self.assertEqual("  Hmm, couldn't find anything here.", output[2])
 
     def test_blank_db(self):
         with mind.get_db(Path("tests/data/blank.db")) as con:
@@ -178,21 +182,21 @@ class TestSQLite(unittest.TestCase):
                 excluded.append(mind.do_forget(con,
                                                Namespace(forget=f"{2}"))[0])
             # When
-            tag_0 = mind.do_list(con, Namespace(list="0"))
-            tag_1 = mind.do_list(con, Namespace(list="1"))
+            tag_0 = mind.do_list(con, Namespace(list="0", num=10))
+            tag_1 = mind.do_list(con, Namespace(list="1", num=10))
 
             excluded_set = set([text.split(sep)[-1] for text in excluded])
-            tag_0_set = set([text.split(sep)[-1] for text in tag_0[1:-2]])
-            tag_1_set = set([text.split(sep)[-1] for text in tag_1[1:-2]])
+            tag_0_set = set([text.split(sep)[-1] for text in tag_0[2:-4]])
+            tag_1_set = set([text.split(sep)[-1] for text in tag_1[2:-4]])
 
             self.assertSetEqual(set(excluded_set) & set(tag_0_set), set())
             self.assertSetEqual(set(excluded_set) & set(tag_1_set), set())
             self.assertSetEqual(set(tag_0_set) & set(tag_1_set), set())
 
             union = excluded_set.union(tag_0_set).union(tag_1_set)
-            self.assertEqual(len(tag_0_set), 9)
-            self.assertEqual(len(tag_1_set), 9)
-            self.assertEqual(len(union), 26)
+            self.assertEqual(len(tag_0_set), 10)
+            self.assertEqual(len(tag_1_set), 10)
+            self.assertEqual(len(union), 28)
 
     def test_run(self):
         mind.run(Namespace(db=self.MEM, cmd=None))

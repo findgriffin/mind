@@ -23,6 +23,8 @@ TAG = "tag"
 TAGS = "tags"
 TAG_PREFIX = "#"
 PAGE_SIZE = 9
+VIEW_WIDTH = 80
+H_RULE = "-" * VIEW_WIDTH
 
 
 class Cmd(Enum):
@@ -108,11 +110,10 @@ class Stuff(NamedTuple):
                        placeholder=" ...") if self.body else "EMPTY"
 
     def show(self, tags=[]) -> list[str]:
-        h_rule = "-" * 32
         tag_names = [tag.tag for tag in tags]
         tag_names.sort()
-        return [f"Stuff [{self.human_id()}]", h_rule,
-                "Tags: " + ", ".join(tag_names), h_rule, self.body]
+        return [f"Stuff [{self.human_id()}]", H_RULE,
+                "Tags: " + ", ".join(tag_names), H_RULE, self.body]
 
     def __str__(self):
         return f"{self.human_id()} -> {self.preview()}"
@@ -126,12 +127,6 @@ class Stuff(NamedTuple):
 
 
 TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag}
-
-
-def add_command(sub_parsers, name, help, nargs=1):
-    command = sub_parsers.add_parser(name)
-    command.add_argument(name, type=str, nargs=nargs, help=help)
-    return command
 
 
 def parse_item(args: list[str]) -> int:
@@ -274,17 +269,24 @@ def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
     if filter:
         parsed = parse_filter(filter)
         filter_desc = "=".join(parsed)
-        fetched = QueryStuff(latest=latest, tag=parsed[1]).execute(con)
+        fetched = QueryStuff(latest=latest, tag=parsed[1],
+                             limit=args.num+1).execute(con)
     else:
-        fetched = QueryStuff(latest=latest).execute(con)
+        fetched = QueryStuff(latest=latest, limit=args.num+1).execute(con)
     noun = "latest" if latest else "oldest"
-    output = [f"Currently minding {noun} [{filter_desc}]..."]
-    for index, row in enumerate(fetched[:PAGE_SIZE], 1):
-        output.append(f" {index}. {row}")
-    if len(fetched) > PAGE_SIZE:
-        output.append("And more...")
+    output = [f" # Currently minding [{noun}] [{filter_desc}] "
+              f"[num={args.num}]...", H_RULE]
+    if fetched:
+        for index, row in enumerate(fetched[:args.num], 1):
+            output.append(f" {index}. {row}")
+    else:
+        output.append("  Hmm, couldn't find anything here.")
+    if len(fetched) > args.num:
+        output.append("    And more...")
     tags = ", ".join([t.tag for t in QueryTags(id=None).execute(con)])
-    return output + wrap(f"Latest tags: {tags}")
+    wrapped = wrap(f"Latest tags: {tags}", initial_indent="  ",
+                   subsequent_indent=" " * 15)
+    return output + [H_RULE] + wrapped + [H_RULE]
 
 
 def do_state_change(con: Connection, args: list[str],
@@ -352,6 +354,7 @@ def run(args: argparse.Namespace) -> list[str]:
         if args.cmd in COMMANDS:
             return COMMANDS[args.cmd](con, args)
         else:
+            args.num = PAGE_SIZE
             return do_list(con, args)
     con.close()
 
@@ -363,14 +366,24 @@ def setup_logging(verbose: bool = False):
     logging.debug("Verbose logging enabled.")
 
 
+def add_command(sub_parsers, name, help, nargs=1):
+    command = sub_parsers.add_parser(name)
+    command.add_argument(name, type=str, nargs=nargs, help=help)
+    return command
+
+
+def add_list_cmd(sub_parsers, name, help):
+    sub_parser = add_command(sub_parsers, name, help, nargs='?')
+    sub_parser.add_argument("-n", "--num", type=int, default=PAGE_SIZE,
+                            help="How much stuff to list.")
+
+
 def setup(argv) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Hello! I'm here to mind your stuff for you.")
-
     sub_parsers = parser.add_subparsers(dest=CMD,
                                         help="Do '.. {cmd} -h' to; get help "
                                              "for subcommands.")
-
     add = sub_parsers.add_parser(Cmd.ADD.value,
                                  help="Add stuff to mind.")
     add_group = add.add_mutually_exclusive_group()
@@ -379,14 +392,12 @@ def setup(argv) -> argparse.Namespace:
                            help="Add stuff interactively")
     add_group.add_argument("-t", "--text", type=str,
                            help="Add text from the command line")
-
     add_command(sub_parsers, Cmd.SHOW.value, "Show stuff.")
     add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
-    add_command(sub_parsers, Cmd.LIST.value, nargs="?",
-                help="List your latest stuff.")
     add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
-    add_command(sub_parsers, Cmd.CLEAN.value, nargs='?',
-                help="List your oldest stuff, so you can clean it up ;).")
+    add_list_cmd(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
+    add_list_cmd(sub_parsers, Cmd.CLEAN.value,
+                 "List your oldest stuff, so you can clean it up ;).")
     parser.add_argument("--db", type=str, default=DEFAULT_DB,
                         help=f"DB file, defaults to {DEFAULT_DB}")
     parser.add_argument("-v", "--verbose",  action="store_true",

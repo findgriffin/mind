@@ -75,7 +75,7 @@ class TestSQLite(unittest.TestCase):
             mind.add_content(con, ["less stuff??? #hello"])
             sleep(.02)
             mind.add_content(con, ["less stuff??? #thing"])
-            latest = mind.get_latest_tags(con)
+            latest = mind.QueryTags(id=None).execute(con)
             self.assertListEqual([tag.tag for tag in latest],
                                  ["thing", "hello", "stuff"])
         con.close()
@@ -91,7 +91,7 @@ class TestSQLite(unittest.TestCase):
                 mind.add_content(con, [f"{letters} #{i % inserted_tags}"])
                 sleep(.005)
             # When
-            output = mind.get_latest_tags(con)
+            output = mind.QueryTags(id=None).execute(con)
             # Then
             self.assertEqual(len(output), expected_tags)
             for i, tag in enumerate(reversed(output), start=5):

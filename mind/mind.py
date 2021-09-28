@@ -176,27 +176,19 @@ class QueryStuff(NamedTuple):
 
 
 class QueryTags(NamedTuple):
-    id: str
+    id: Optional[str]
+    limit: int = 15
 
     def cmd(self):
-        return "SELECT id, tag FROM tags WHERE id=:id"
+        if self.id:
+            return "SELECT id, tag FROM tags WHERE id=:id ORDER BY tag ASC"
+        else:
+            return SPACE.join(["SELECT MAX(id), tag FROM tags GROUP BY tag",
+                               "ORDER BY id DESC LIMIT :limit"])
 
     def execute(self, con: Connection) -> list[Tag]:
         cur = sqlite_execute(con, self.cmd(), self._asdict())
         return [Tag(*row) for row in cur.fetchall()]
-
-
-def get_latest_tags(con: Connection, limit=15) -> list[Tag]:
-    with con:
-        cur = con.execute(f"SELECT * FROM {TAGS} ORDER BY {ID} DESC LIMIT 100")
-        latest: dict[str, Tag] = {}
-        for row in cur.fetchall():
-            tag = Tag(*row)
-            latest[tag.tag] = tag
-        logging.debug(f"Found {len(latest)}")
-        # Python dicts are now insertion sorted:
-        # https://stackoverflow.com/questions/39980323/are-dictionaries-ordered-in-python-3-6
-        return list(latest.values())[:limit]
 
 
 def build_create_table_cmd(table_name: str, schema) -> str:
@@ -294,7 +286,7 @@ def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
         output.append(f" {index}. {row}")
     if len(fetched) > PAGE_SIZE:
         output.append("And more...")
-    tags = ", ".join([t.tag for t in get_latest_tags(con)])
+    tags = ", ".join([t.tag for t in QueryTags(id=None).execute(con)])
     return output + wrap(f"Latest tags: {tags}")
 
 

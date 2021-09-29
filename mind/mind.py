@@ -219,7 +219,7 @@ def extract_tags(raw_line: str):
     return SPACE.join(content), tags
 
 
-def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, set[str]]:
+def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, list[str]]:
     id = datetime.utcnow().isoformat()
     cleaned: list[str] = []
     all_tags: set[str] = set()
@@ -227,7 +227,8 @@ def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, set[str]]:
         body, tags = extract_tags(hunk)
         all_tags = all_tags.union(tags)
         cleaned.append(body)
-    return Stuff(id, joiner.join(cleaned), State.ACTIVE), all_tags
+
+    return Stuff(id, joiner.join(cleaned), State.ACTIVE), sorted(all_tags)
 
 
 # Always returns lowercase

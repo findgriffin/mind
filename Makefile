@@ -5,7 +5,7 @@ install:
 	pip3 install -r requirements.txt
 
 style:
-	flake8
+	flake8 mind
 
 types:
 	mypy .

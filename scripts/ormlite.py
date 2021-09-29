@@ -38,6 +38,20 @@ def parameterized():
                 {"year": 1972})
     print(cur.fetchall())
     con.close()
+
+def commit_log():
+    con = sqlite3.connect("log.db")
+    con.execute("CREATE TABLE IF NOT EXISTS log("
+                "sn INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+                "ts INT NOT NULL DEFAULT (cast(strftime('%s', 'now') as INT)),"
+                "body TEXT)")
+    con.commit()
+    con.execute("INSERT INTO log (body) VALUES (:body)",
+                {"body": "Hello, world!"})
+    con.commit()
+    for row in con.execute("SELECT * FROM log"):
+        print(row)
 #create_and_insert()
-select()
-parameterized()
+#select()
+#parameterized()
+commit_log()

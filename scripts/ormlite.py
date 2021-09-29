@@ -52,27 +52,35 @@ class DBCon():
         self.con.row_factory = sqlite3.Row
         print(self.con.isolation_level)
 
-    def tx(self, stmt, params=()) -> list[Row]:
-        cur = None
+    def tx(self, stmt, params=()) -> Cursor:
         with self.con:
-            print(f"tx: {self.con.in_transaction}")
-            cur = self.con.execute(stmt, params).fetchall()
-            print(f"tx: {self.con.in_transaction}")
-        print(f"tx: {self.con.in_transaction}")
-        return cur
+            cur = self.con.execute(stmt, params)
+            return cur
 
     def query(self, stmt, params=()) -> Cursor:
         return self.con.execute(stmt, params).fetchall()
 
+class Log():
+    name = "log"
+    def __init__(self, con: DBCon):
+        self.con = con
+        con.tx("CREATE TABLE IF NOT EXISTS log("
+               "sn INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+               "ts INT NOT NULL DEFAULT (cast(strftime('%s', 'now') as INT)),"
+               "body TEXT NOT NULL)")
+
+    def append(self, body):
+        cur = self.con.tx("INSERT INTO log(body) VALUES (?)", (body,))
+        print(f"Appended {cur.lastrowid}")
+
+    def query(self, fields = None):
+        self.con.query()
+
 
 def commit_log():
     con = DBCon("log.db")
-    con.tx("CREATE TABLE IF NOT EXISTS log("
-                "sn INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
-                "ts INT NOT NULL DEFAULT (cast(strftime('%s', 'now') as INT)),"
-                "body TEXT NOT NULL)")
-    con.tx("INSERT INTO log(body) VALUES (:body)",
-                {"body": "Hello, world!"})
+    log = Log(con)
+    log.append("Helloooo!")
 
     for row in con.query("SELECT * FROM log ORDER BY sn DESC"):
         print(row[:])

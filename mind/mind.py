@@ -47,13 +47,12 @@ class SQLiteType(Enum):
 
 class SQLiteMapping(NamedTuple):
     wire_type: SQLiteType
-    converter: Optional[Callable] = None
     adapter: Optional[Callable] = None
 
 
 state_mapping = SQLiteMapping(wire_type=SQLiteType.INTEGER,
-                              adapter=lambda s: s.value,
-                              converter=State.__init__)
+                              adapter=lambda s: s.value)
+
 
 # None / Null not included here as there are no optional columns (yet)
 # Optional[int|str] could be mapped to removing the 'NOT NULL' constraint
@@ -68,8 +67,6 @@ TYPE_MAP: dict[type, SQLiteMapping] = {
 for t, mapping in TYPE_MAP.items():
     if mapping.adapter:
         sqlite3.register_adapter(t, mapping.adapter)
-    if mapping.converter:
-        sqlite3.register_converter(t.__name__, mapping.converter)
 
 
 class Tag(NamedTuple):

@@ -54,16 +54,11 @@ class SQLiteMapping(NamedTuple):
 state_mapping = SQLiteMapping(wire_type=SQLiteType.INTEGER,
                               adapter=lambda s: s.value,
                               converter=State.__init__)
-dt_mapping = SQLiteMapping(
-    wire_type=SQLiteType.INTEGER,
-    adapter=lambda dt: dt.timestamp(),
-    converter=datetime.fromtimestamp)
 
 # None / Null not included here as there are no optional columns (yet)
 # Optional[int|str] could be mapped to removing the 'NOT NULL' constraint
 TYPE_MAP: dict[type, SQLiteMapping] = {
     State: state_mapping,
-    datetime: dt_mapping,
     int:    SQLiteMapping(wire_type=SQLiteType.INTEGER),
     float:  SQLiteMapping(wire_type=SQLiteType.REAL),
     str:    SQLiteMapping(wire_type=SQLiteType.TEXT),
@@ -78,7 +73,7 @@ for t, mapping in TYPE_MAP.items():
 
 
 class Tag(NamedTuple):
-    id: datetime
+    id: int
     tag: str
 
 

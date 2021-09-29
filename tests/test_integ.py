@@ -20,7 +20,7 @@ class TestInteg(unittest.TestCase):
 
     def test_run_method(self):
         # Given
-        args = Namespace(db=self.MEM, cmd=mind.Cmd.ADD.value,
+        args = Namespace(db=self.MEM, cmd="add",
                          text=None, interactive=None,
                          file="tests/data/note.md")
         # When
@@ -28,4 +28,5 @@ class TestInteg(unittest.TestCase):
         # Then
         self.assertEqual(1, len(output))
         self.assertTrue(output[0].startswith("Added "))
-        self.assertTrue(output[0].endswith(" -> # This is how you Markdown"))
+        self.assertIn(" -> # This is how you Markdown", output[0])
+        self.assertTrue(output[0].endswith("tags[markdown, nohello]"))

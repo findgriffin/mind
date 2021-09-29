@@ -13,6 +13,7 @@ import sys
 
 ID = "id"
 BODY = "body"
+CLEAN = "clean"
 CMD = "cmd"
 DEFAULT_DB = "~/.mind.db"
 NEWLINE = "\n"
@@ -25,16 +26,6 @@ TAG_PREFIX = "#"
 PAGE_SIZE = 9
 VIEW_WIDTH = 80
 H_RULE = "-" * VIEW_WIDTH
-
-
-class Cmd(Enum):
-    ADD = "add"
-    CLEAN = "clean"
-    FORGET = "forget"
-    HISTORY = "history"
-    LIST = "list"
-    SHOW = "show"
-    TICK = "tick"
 
 
 class State(Enum):
@@ -255,7 +246,7 @@ def parse_filter(arg: str):
 
 
 def order_and_filter(args: argparse.Namespace) -> tuple[bool, Optional[str]]:
-    latest = CMD not in args or args.cmd != Cmd.CLEAN.value
+    latest = CMD not in args or args.cmd != CLEAN
     try:
         filter = args.list if latest else args.clean
         return latest, filter
@@ -323,13 +314,13 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
 
 
 def add_content(con: Connection, content: list[str]) -> list[str]:
-    logging.debug(f"Doing add: {content}")
     stuff, tags = new_stuff(content)
+    logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
     with con:
         con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)
-        for tag in tags:
-            con.execute(f"INSERT INTO {TAGS} VALUES (?, ?)", (stuff.id, tag))
-    return [f"Added {stuff}"]
+        con.executemany(f"INSERT INTO {TAGS} VALUES (?, ?)",
+                        map(lambda t: (stuff.id, t), tags))
+    return [f"Added {stuff} tags[{', '.join(tags)}]"]
 
 
 def do_add(con: Connection, args: argparse.Namespace) -> list[str]:
@@ -343,33 +334,10 @@ def do_add(con: Connection, args: argparse.Namespace) -> list[str]:
         raise NotImplementedError
 
 
-COMMANDS = {
-    "add": do_add,
-    "clean": do_list,
-    "forget": do_forget,
-    "history": do_history,
-    "list": do_list,
-    "show": do_show,
-    "tick": do_tick,
-}
-
-
-def run(args: argparse.Namespace) -> list[str]:
-    logging.debug(f"Running with arguments: {args}")
-    with get_db(args.db) as con:
-        if args.cmd in COMMANDS:
-            return COMMANDS[args.cmd](con, args)
-        else:
-            args.num = PAGE_SIZE
-            return do_list(con, args)
-    con.close()
-
-
-def setup_logging(verbose: bool = False):
-    fmt = "%(levelname)s: %(message)s" if verbose else "%(message)s"
-    lvl = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(level=lvl, format=fmt)
-    logging.debug("Verbose logging enabled.")
+class Command(NamedTuple):
+    do: Callable
+    add: Callable
+    help: str
 
 
 def add_command(sub_parsers, name, help, nargs=1):
@@ -384,25 +352,53 @@ def add_list_cmd(sub_parsers, name, help):
                             help="How much stuff to list.")
 
 
-def setup(argv) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Hello! I'm here to mind your stuff for you.")
-    sub_parsers = parser.add_subparsers(
-        dest=CMD, help="Do '.. {cmd} -h' to; get help for subcommands.")
-    add = sub_parsers.add_parser(Cmd.ADD.value, help="Add stuff to mind.")
+def add_add_cmd(sub_parsers, name, help):
+    add = sub_parsers.add_parser(name, help=help)
     add_group = add.add_mutually_exclusive_group()
     add_group.add_argument("--file", type=str, help="Add stuff from a file.")
     add_group.add_argument("-i", "--interactive", action="store_true",
                            help="Add stuff interactively.")
     add_group.add_argument("-t", "--text", type=str,
                            help="Add text from the command line")
-    add_command(sub_parsers, Cmd.FORGET.value, "Which stuff to forget.")
-    add_command(sub_parsers, Cmd.SHOW.value, "Show stuff.")
-    add_command(sub_parsers, Cmd.TICK.value, "Which stuff to tick off.")
-    add_list_cmd(sub_parsers, Cmd.HISTORY.value, "Show history of changes.")
-    add_list_cmd(sub_parsers, Cmd.LIST.value, "List your latest stuff.")
-    add_list_cmd(sub_parsers, Cmd.CLEAN.value,
-                 "List your oldest stuff, so you can clean it up ;).")
+
+
+COMMANDS = {
+    "add":      Command(do=do_add, add=add_add_cmd, help="Add stuff to mind."),
+    CLEAN:      Command(do=do_list, add=add_list_cmd,
+                        help="List oldest stuff, so you can clean it up ;)."),
+    "forget":   Command(do_forget, add_command, "Which stuff to forget."),
+    "history":  Command(do_history, add_list_cmd, "Show history of changes."),
+    "list":     Command(do_list, add_list_cmd, "List your latest stuff."),
+    "show":     Command(do_show, add_command, "Show stuff."),
+    "tick":     Command(do_tick, add_command, "Mark stuff as complete."),
+}
+
+
+def run(args: argparse.Namespace) -> list[str]:
+    logging.debug(f"Running with arguments: {args}")
+    with get_db(args.db) as con:
+        if args.cmd in COMMANDS:
+            return COMMANDS[args.cmd].do(con, args)
+        else:
+            args.num = PAGE_SIZE
+            return do_list(con, args)
+    con.close()
+
+
+def setup_logging(verbose: bool = False):
+    fmt = "%(levelname)s: %(message)s" if verbose else "%(message)s"
+    lvl = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(level=lvl, format=fmt)
+    logging.debug("Verbose logging enabled.")
+
+
+def setup(argv) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Hello! I'm here to mind your stuff for you.")
+    sub_parsers = parser.add_subparsers(
+        dest=CMD, help="Do '.. {cmd} -h' to; get help for subcommands.")
+    for name, cmd in COMMANDS.items():
+        cmd.add(sub_parsers, name, cmd.help)
     parser.add_argument("--db", type=str, default=DEFAULT_DB,
                         help=f"DB file, defaults to {DEFAULT_DB}")
     parser.add_argument("-v", "--verbose",  action="store_true",

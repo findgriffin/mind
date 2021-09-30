@@ -29,9 +29,10 @@ H_RULE = "-" * VIEW_WIDTH
 
 
 class State(Enum):
+    ABSENT = -1
     ACTIVE = 0
-    TICKED = 1
-    FORGOTTEN = 2
+    DONE = 1
+    HIDDEN = 2
 
     def __repr__(self):
         return f"{self.name}({self.value})"
@@ -66,7 +67,8 @@ TYPE_MAP: dict[type, SQLiteType] = {
 
 class Record(NamedTuple):
     sn: Sequence
-    body: str
+    stuff: int
+    before: State
 
     @classmethod
     def constraints(self) -> list[str]:
@@ -303,11 +305,11 @@ def do_state_change(con: Connection, args: list[str],
 
 
 def do_forget(con: Connection, args: argparse.Namespace) -> list[str]:
-    return do_state_change(con, args.forget, State.FORGOTTEN)
+    return do_state_change(con, args.forget, State.HIDDEN)
 
 
 def do_tick(con: Connection, args: argparse.Namespace) -> list[str]:
-    return do_state_change(con, args.tick, State.TICKED)
+    return do_state_change(con, args.tick, State.DONE)
 
 
 def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
@@ -332,6 +334,8 @@ def add_content(con: Connection, content: list[str]) -> list[str]:
         logging.debug(f"Inserted with ID: {cur.lastrowid}")
         con.executemany(f"INSERT INTO {TAGS} VALUES (?, ?)",
                         map(lambda t: (stuff.id, t), tags))
+        con.execute("INSERT INTO log (stuff, before) VALUES (?, ?)",
+                    (stuff.id, State.ABSENT))
     return [f"Added {stuff} tags[{', '.join(tags)}]"]
 
 

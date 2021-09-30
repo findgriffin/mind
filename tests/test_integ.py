@@ -48,6 +48,18 @@ class TestInteg(unittest.TestCase):
         # Given
         path = Path("tests/data/schema-v2.db")
         # When
+        with self.assertRaises(RuntimeError) as context:
+            with mind.get_db(path, strict=True) as con:
+                mind.QueryStuff().execute(con)
+            con.close()
+        # Then
+        self.assertIn("Error for table", str(context.exception))
+        self.assertIn("Found: ", str(context.exception))
+
+    def test_schema_v3(self):
+        # Given
+        path = Path("tests/data/schema-v3.db")
+        # When
         with mind.get_db(path, strict=True) as con:
             mind.QueryStuff().execute(con)
         # Then

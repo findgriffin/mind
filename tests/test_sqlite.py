@@ -58,7 +58,7 @@ class TestSQLite(unittest.TestCase):
                 mind.add_content(con, ["some more stuff!!"])
                 active_before = mind.QueryStuff().execute(con)
                 self.assertEqual(2, len(active_before))
-                ticked = mind.do_state_change(con, ["1"], mind.State.TICKED)
+                ticked = mind.do_state_change(con, ["1"], mind.State.DONE)
                 active_after = mind.QueryStuff().execute(con)
                 self.assertEqual(1, len(active_after))
                 self.assertNotIn("more", active_after[0][1])
@@ -117,7 +117,7 @@ class TestSQLite(unittest.TestCase):
             output = mind.do_forget(con, args)
             # Then
             self.assertEqual(1, len(output))
-            self.assertTrue(output[0].startswith("Forgotten: "))
+            self.assertTrue(output[0].startswith("Hidden: "))
             self.assertTrue(output[0].endswith(" -> some content"))
 
     def test_forget_when_empty(self):

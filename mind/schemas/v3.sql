@@ -17,6 +17,7 @@ CREATE TABLE tags(
 );
 /* Must do this for every session */
 PRAGMA foreign_keys = ON;
+PRAGMA checkpoint_fullfsync
 
 /* Example add operation */
 BEGIN TRANSACTION;

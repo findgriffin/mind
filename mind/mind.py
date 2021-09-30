@@ -82,12 +82,16 @@ def sqlite_execute(con: Connection, sql: str, params: dict) -> Cursor:
 
 
 class Stuff(NamedTuple):
-    id: str
+    id: int     # Epoch (in microseconds), ms was too course for tests.
     body: str
     state: State = State.ACTIVE
 
+    def epoch(self) -> int:
+        """Returns the unix epoch of this stuff in seconds, as an integer."""
+        return int(self.id * 1e-6)
+
     def human_id(self):
-        return self.id[:16]
+        return datetime.fromtimestamp(self.epoch()).isoformat()[:16]
 
     def preview(self, width=40):
         return shorten(self.body.splitlines()[0], width=width,
@@ -152,7 +156,7 @@ class QueryStuff(NamedTuple):
 
 
 class QueryTags(NamedTuple):
-    id: Optional[str]
+    id: Optional[int]
     limit: int = 15
 
     def cmd(self):
@@ -217,7 +221,7 @@ def extract_tags(raw_line: str):
 
 
 def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, list[str]]:
-    id = datetime.utcnow().isoformat()
+    id = int(datetime.utcnow().timestamp() * 1e6)
     cleaned: list[str] = []
     all_tags: set[str] = set()
     for hunk in hunks:
@@ -310,7 +314,8 @@ def add_content(con: Connection, content: list[str]) -> list[str]:
     stuff, tags = new_stuff(content)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
     with con:
-        con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)
+        cur = con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)
+        logging.debug(f"Inserted with ID: {cur.lastrowid}")
         con.executemany(f"INSERT INTO {TAGS} VALUES (?, ?)",
                         map(lambda t: (stuff.id, t), tags))
     return [f"Added {stuff} tags[{', '.join(tags)}]"]

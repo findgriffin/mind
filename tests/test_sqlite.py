@@ -8,8 +8,6 @@ import unittest
 
 from mind import mind
 
-fromiso = datetime.fromisoformat
-
 
 class TestSQLite(unittest.TestCase):
     MEM = ":memory:"
@@ -20,10 +18,10 @@ class TestSQLite(unittest.TestCase):
             # Then
             self.assertFalse(con.isolation_level)
             self.assertFalse(con.in_transaction)
-            cur = con.execute("SELECT * FROM sqlite_master")
-            self.assertEqual(cur.fetchone()[-1],
-                             "CREATE TABLE stuff(id TEXT NOT NULL,"
-                             " body TEXT NOT NULL, state INTEGER NOT NULL)")
+            cur1 = con.execute("SELECT * FROM stuff")
+            self.assertEqual(cur1.lastrowid, 0)
+            cur2 = con.execute("SELECT * FROM tags")
+            self.assertEqual(cur2.lastrowid, 0)
         con.close()
 
     def test_add_and_query(self):
@@ -33,13 +31,13 @@ class TestSQLite(unittest.TestCase):
             fetched = mind.QueryStuff().execute(con)
             # Then
             self.assertEqual(fetched[0][1], "one")
-            now = datetime.utcnow()
+            now = datetime.utcnow().timestamp()
             # Note: from https://docs.python.org/3/library/datetime.html
             #  > This does not support parsing arbitrary ISO 8601 strings
             #  > - it is only intended as the inverse operation of
             #  > datetime.isoformat()
             # This is good for testing, it makes it a strict test!
-            self.assertGreater(now, fromiso(fetched[0][0]))
+            self.assertGreater(now * 1e6, fetched[0].id)
         con.close()
 
     def test_add_many_and_query(self):
@@ -50,21 +48,24 @@ class TestSQLite(unittest.TestCase):
             # Then
             fetched = mind.QueryStuff().execute(con)
             self.assertEqual(10, len(fetched))
-            self.assertGreater(fromiso(fetched[0][0]),
-                               fromiso(fetched[-1][0]))
+            self.assertGreater(fetched[0][0], fetched[-1][0])
         con.close()
 
     def test_update_correct_entry(self):
-        with mind.get_db(self.MEM) as con:
-            mind.add_content(con, ["some stuff!!"])
-            mind.add_content(con, ["some more stuff!!"])
-            active_before = mind.QueryStuff().execute(con)
-            self.assertEqual(2, len(active_before))
-            mind.do_state_change(con, ["1"], mind.State.TICKED)
-            active_after = mind.QueryStuff().execute(con)
-            self.assertEqual(1, len(active_after))
-            self.assertNotIn("more", active_after[0][1])
-        con.close()
+        try:
+            with mind.get_db(self.MEM) as con:
+                mind.add_content(con, ["some stuff!!"])
+                mind.add_content(con, ["some more stuff!!"])
+                active_before = mind.QueryStuff().execute(con)
+                self.assertEqual(2, len(active_before))
+                ticked = mind.do_state_change(con, ["1"], mind.State.TICKED)
+                active_after = mind.QueryStuff().execute(con)
+                self.assertEqual(1, len(active_after))
+                self.assertNotIn("more", active_after[0][1])
+
+            con.close()
+        except:
+            print(con.execute("SELECT * FROM stuff").fetchall())
 
     def test_add_with_tags(self):
         with mind.get_db(self.MEM) as con:

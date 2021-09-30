@@ -16,5 +16,5 @@ class TestTypes(unittest.TestCase):
         # When
         cmd = mind.build_create_table_cmd("stuffs", mind.Stuff)
         # Then
-        self.assertEqual("CREATE TABLE stuffs(id TEXT NOT NULL, "
+        self.assertEqual("CREATE TABLE stuffs(id INTEGER NOT NULL, "
                          "body TEXT NOT NULL, state INTEGER NOT NULL)", cmd)

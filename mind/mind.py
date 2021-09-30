@@ -37,6 +37,9 @@ class State(Enum):
         return f"{self.name}({self.value})"
 
 
+sqlite3.register_adapter(State, lambda s: s.value)
+
+
 class SQLiteType(Enum):
     BLOB = "BLOB"
     INTEGER = "INTEGER"
@@ -49,29 +52,16 @@ class SQLiteType(Enum):
 Sequence = NewType('Sequence', int)
 
 
-class SQLiteMapping(NamedTuple):
-    wire_type: SQLiteType
-    adapter: Optional[Callable] = None
-
-
-state_mapping = SQLiteMapping(wire_type=SQLiteType.INTEGER,
-                              adapter=lambda s: s.value)
-
-
 # None / Null not included here as there are no optional columns (yet)
 # Optional[int|str] could be mapped to removing the 'NOT NULL' constraint
-TYPE_MAP: dict[type, SQLiteMapping] = {
-    State: state_mapping,
-    Sequence: SQLiteMapping(wire_type=SQLiteType.SEQUENCE),
-    int:    SQLiteMapping(wire_type=SQLiteType.INTEGER),
-    float:  SQLiteMapping(wire_type=SQLiteType.REAL),
-    str:    SQLiteMapping(wire_type=SQLiteType.TEXT),
-    bytes:  SQLiteMapping(wire_type=SQLiteType.BLOB)
+TYPE_MAP: dict[type, SQLiteType] = {
+    State: SQLiteType.INTEGER,
+    Sequence: SQLiteType.SEQUENCE,
+    int:    SQLiteType.INTEGER,
+    float:  SQLiteType.REAL,
+    str:    SQLiteType.TEXT,
+    bytes:  SQLiteType.BLOB
 }
-
-for t, mapping in TYPE_MAP.items():
-    if mapping.adapter:
-        sqlite3.register_adapter(t, mapping.adapter)
 
 
 class Record(NamedTuple):
@@ -197,7 +187,7 @@ def build_create_table_cmd(table_name: str, schema) -> str:
     columns = []
     for annotation in schema.__annotations__.items():
         name = annotation[0]
-        sqlite_type = TYPE_MAP[annotation[1]].wire_type.value
+        sqlite_type = TYPE_MAP[annotation[1]].value
         columns.append(f"{name} {sqlite_type} NOT NULL")
     const = schema.constraints()
     c_clauses = ", " + ", ".join(const) if const else ""

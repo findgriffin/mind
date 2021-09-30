@@ -8,7 +8,7 @@ style:
 	flake8 mind
 
 types:
-	mypy .
+	mypy mind
 
 test:
 	coverage run --source mind -m unittest discover

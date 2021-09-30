@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from textwrap import wrap, shorten
-from typing import NamedTuple, Callable, Optional
+from typing import NamedTuple, Callable, Optional, NewType
 import argparse
 import logging
 import sqlite3
@@ -38,11 +38,15 @@ class State(Enum):
 
 
 class SQLiteType(Enum):
-    NULL = "NULL"
-    INTEGER = "INTEGER"
-    REAL = "REAL"
-    TEXT = "TEXT"
     BLOB = "BLOB"
+    INTEGER = "INTEGER"
+    NULL = "NULL"
+    REAL = "REAL"
+    SEQUENCE = "INTEGER PRIMARY KEY AUTOINCREMENT"
+    TEXT = "TEXT"
+
+
+Sequence = NewType('Sequence', int)
 
 
 class SQLiteMapping(NamedTuple):
@@ -58,6 +62,7 @@ state_mapping = SQLiteMapping(wire_type=SQLiteType.INTEGER,
 # Optional[int|str] could be mapped to removing the 'NOT NULL' constraint
 TYPE_MAP: dict[type, SQLiteMapping] = {
     State: state_mapping,
+    Sequence: SQLiteMapping(wire_type=SQLiteType.SEQUENCE),
     int:    SQLiteMapping(wire_type=SQLiteType.INTEGER),
     float:  SQLiteMapping(wire_type=SQLiteType.REAL),
     str:    SQLiteMapping(wire_type=SQLiteType.TEXT),
@@ -67,6 +72,15 @@ TYPE_MAP: dict[type, SQLiteMapping] = {
 for t, mapping in TYPE_MAP.items():
     if mapping.adapter:
         sqlite3.register_adapter(t, mapping.adapter)
+
+
+class Record(NamedTuple):
+    sn: Sequence
+    body: str
+
+    @classmethod
+    def constraints(self) -> list[str]:
+        return []
 
 
 class Tag(NamedTuple):
@@ -122,7 +136,7 @@ class Stuff(NamedTuple):
         sqlite_execute(con, sql, {"id": self.id, "state": new_state})
 
 
-TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag}
+TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag, "log": Record}
 
 
 def parse_item(args: list[str]) -> int:

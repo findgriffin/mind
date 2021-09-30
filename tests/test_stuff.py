@@ -12,8 +12,8 @@ class TestStuff(unittest.TestCase):
         stuff, tags = mind.new_stuff([body])
         output = stuff.__repr__()
         # Then
-        self.assertEqual(len(output), 47)  # .strip() remove last space
-        self.assertEqual("ption ...]", output[-10:])
+        self.assertEqual(len(output), 54)  # .strip() remove last space
+        self.assertEqual("onger ...]", output[-10:])
 
     def test_human_readable(self):
         # Given

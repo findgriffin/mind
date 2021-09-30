@@ -107,7 +107,7 @@ class Stuff(NamedTuple):
         return f"{self.human_id()} -> {self.preview()}"
 
     def __repr__(self):
-        return f"Stuff[{self.id} -> {self.preview(width=20)}]"
+        return f"Stuff[{hex(self.id)[2:]} -> {self.preview(width=30)}]"
 
     def update_state(self, con, new_state) -> None:
         sql = "UPDATE stuff SET state=:state WHERE id=:id"
@@ -302,8 +302,11 @@ def do_tick(con: Connection, args: argparse.Namespace) -> list[str]:
 def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
     id = parse_item(args.show)
     rows = QueryStuff(limit=1, offset=id-1).execute(con)
-    tags = QueryTags(id=rows[0].id).execute(con)
-    return rows[0].show(tags)
+    any(map(lambda r: logging.debug(f"Returned row: {r.__repr__()}"), rows))
+    if rows:
+        return rows[0].show(QueryTags(id=rows[0].id).execute(con))
+    else:
+        return [f"Stuff [{id}] not found."]
 
 
 def do_history(con: Connection, args: argparse.Namespace) -> list[str]:

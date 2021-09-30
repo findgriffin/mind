@@ -1,6 +1,7 @@
 import logging
 import unittest
 from argparse import Namespace
+from pathlib import Path
 
 from mind import mind
 
@@ -30,3 +31,24 @@ class TestInteg(unittest.TestCase):
         self.assertTrue(output[0].startswith("Added "))
         self.assertIn(" -> # This is how you Markdown", output[0])
         self.assertTrue(output[0].endswith("tags[markdown, nohello]"))
+
+    def test_schema_v1(self):
+        # Given
+        path = Path("tests/data/schema-v1.db")
+        # When
+        with self.assertRaises(RuntimeError) as context:
+            with mind.get_db(path, strict=True) as con:
+                mind.QueryStuff().execute(con)
+            con.close()
+        # Then
+        self.assertIn("Error for table", str(context.exception))
+        self.assertIn("Found: ", str(context.exception))
+
+    def test_schema_v2(self):
+        # Given
+        path = Path("tests/data/schema-v2.db")
+        # When
+        with mind.get_db(path, strict=True) as con:
+            mind.QueryStuff().execute(con)
+        # Then
+        con.close()

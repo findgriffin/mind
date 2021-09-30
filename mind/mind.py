@@ -204,7 +204,7 @@ def build_create_table_cmd(table_name: str, schema) -> str:
     return f"CREATE TABLE {table_name}({', '.join(columns)}{c_clauses})"
 
 
-def get_db(filename: str = DEFAULT_DB, strict: bool = False):
+def get_db(filename: str = DEFAULT_DB, strict: bool = False) -> Connection:
     path = Path(filename).expanduser()
     exists = path.exists()
     logging.debug(f"Opening DB {path}, exists: {path.exists()}")
@@ -212,19 +212,16 @@ def get_db(filename: str = DEFAULT_DB, strict: bool = False):
         for name, schema in TABLES.items():
             create_cmd = build_create_table_cmd(name, schema)
             if exists:
-                cur = con.execute("SELECT * FROM sqlite_master WHERE "
-                                  "name=?", [name])
-                existing_db = cur.fetchone()[4]
-                if existing_db != create_cmd:
-                    msg = "Database tables do not match. Expected " \
-                          f"{create_cmd}, but found {existing_db}"
+                row = con.execute("SELECT * FROM sqlite_master WHERE "
+                                  "name=?", [name]).fetchone()
+                if not row or row[4] != create_cmd:
+                    msg = f"Error for table {name}. Found: {row}"
+                    logging.debug(msg)
                     if strict:
                         raise RuntimeError(msg)
-                    else:
-                        logging.debug(msg)
             else:
                 con.execute(create_cmd)
-        return con
+    return con
 
 
 def is_tag(word: str) -> Optional[str]:

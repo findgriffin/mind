@@ -106,10 +106,7 @@ class TestSQLite(unittest.TestCase):
             # Then
             self.assertEqual("  Hmm, couldn't find anything here.", output[2])
 
-    def test_blank_db(self):
-        with mind.get_db(Path("tests/data/blank.db")) as con:
-            mind.QueryStuff().execute(con)
-        con.close()
+
 
     def test_forget_success(self):
         # Given

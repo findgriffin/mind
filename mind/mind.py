@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from textwrap import wrap, shorten
-from typing import NamedTuple, Callable, Optional, NewType
+from typing import NamedTuple, Callable, Optional, NewType, Union
 import argparse
 import logging
 import sqlite3
@@ -84,19 +84,20 @@ class Tag(NamedTuple):
         return []
 
 
-def sqlite_query(con: Connection, sql: str, params: dict) -> Cursor:
+Params = Union[dict, tuple]
+Operation = tuple[str, Params]
+
+
+def sqlite_query(con: Connection, sql: str, params: Params) -> Cursor:
     logging.debug(f"Executing SQL   :{sql}")
     logging.debug(f"Executing PARAMS:{params}")
-    with con:
-        return con.execute(sql, params)
+    return con.execute(sql, params)
 
 
-def sqlite_tx(con: Connection, operations: list[tuple[str, dict]]) -> None:
+def sqlite_tx(con: Connection, operations: list[Operation]) -> None:
     with con:
-        for op in operations:
-            logging.debug(f"Executing SQL   :{op[0]}")
-            logging.debug(f"Executing PARAMS:{op[1]}")
-            con.execute(*op)
+        logging.debug("Entered transaction.")
+        [sqlite_query(con, *op) for op in operations]
 
 
 class Stuff(NamedTuple):
@@ -226,6 +227,7 @@ def get_db(filename: str = DEFAULT_DB, strict: bool = False) -> Connection:
                         raise RuntimeError(msg)
             else:
                 con.execute(create_cmd)
+    con.execute("PRAGMA foreign_keys = ON")
     return con
 
 
@@ -342,13 +344,12 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
 def add_content(con: Connection, content: list[str]) -> list[str]:
     stuff, tags = new_stuff(content)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
-    with con:
-        cur = con.execute(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)
-        logging.debug(f"Inserted with ID: {cur.lastrowid}")
-        con.executemany(f"INSERT INTO {TAGS} VALUES (?, ?)",
-                        map(lambda t: (stuff.id, t), tags))
-        con.execute("INSERT INTO log (stuff, before) VALUES (?, ?)",
-                    (stuff.id, State.ABSENT))
+    ops: list[Operation] = [(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)]
+    insert_tag = f"INSERT INTO {TAGS} VALUES (?, ?)"
+    ops.extend(list(map(lambda t: ((insert_tag, (stuff.id, t))), tags)))
+    ops.append(("INSERT INTO log (stuff, before) VALUES (?, ?)",
+                (stuff.id, State.ABSENT)))
+    sqlite_tx(con, ops)
     return [f"Added {stuff} tags[{', '.join(tags)}]"]
 
 

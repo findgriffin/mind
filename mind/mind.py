@@ -73,6 +73,10 @@ class Tag(NamedTuple):
     id: int
     tag: str
 
+    @classmethod
+    def constraints(self) -> list[str]:
+        return []
+
 
 def sqlite_execute(con: Connection, sql: str, params: dict) -> Cursor:
     logging.debug(f"Executing SQL   :{sql}")
@@ -85,6 +89,10 @@ class Stuff(NamedTuple):
     id: int     # Epoch (in microseconds), ms was too course for tests.
     body: str
     state: State = State.ACTIVE
+
+    @classmethod
+    def constraints(self) -> list[str]:
+        return ["PRIMARY KEY (id)"]
 
     def epoch(self) -> int:
         """Returns the unix epoch of this stuff in seconds, as an integer."""
@@ -177,7 +185,9 @@ def build_create_table_cmd(table_name: str, schema) -> str:
         name = annotation[0]
         sqlite_type = TYPE_MAP[annotation[1]].wire_type.value
         columns.append(f"{name} {sqlite_type} NOT NULL")
-    return f"CREATE TABLE {table_name}({', '.join(columns)})"
+    const = schema.constraints()
+    c_clauses = ", " + ", ".join(const) if const else ""
+    return f"CREATE TABLE {table_name}({', '.join(columns)}{c_clauses})"
 
 
 def get_db(filename: str = DEFAULT_DB, strict: bool = False):

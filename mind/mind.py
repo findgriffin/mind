@@ -84,11 +84,19 @@ class Tag(NamedTuple):
         return []
 
 
-def sqlite_execute(con: Connection, sql: str, params: dict) -> Cursor:
+def sqlite_query(con: Connection, sql: str, params: dict) -> Cursor:
     logging.debug(f"Executing SQL   :{sql}")
     logging.debug(f"Executing PARAMS:{params}")
     with con:
         return con.execute(sql, params)
+
+
+def sqlite_tx(con: Connection, operations: list[tuple[str, dict]]) -> None:
+    with con:
+        for op in operations:
+            logging.debug(f"Executing SQL   :{op[0]}")
+            logging.debug(f"Executing PARAMS:{op[1]}")
+            con.execute(*op)
 
 
 class Stuff(NamedTuple):
@@ -123,9 +131,14 @@ class Stuff(NamedTuple):
     def __repr__(self):
         return f"Stuff[{hex(self.id)[2:]} -> {self.preview(width=30)}]"
 
+    def log_cmd(self) -> tuple[str, dict]:
+        stmt = "INSERT INTO log(stuff, before) VALUES (:stuff, :before)"
+        return (stmt, {"stuff": self.id, "before": self.state})
+
     def update_state(self, con, new_state) -> None:
-        sql = "UPDATE stuff SET state=:state WHERE id=:id"
-        sqlite_execute(con, sql, {"id": self.id, "state": new_state})
+        update = "UPDATE stuff SET state=:state WHERE id=:id"
+        args = {"id": self.id, "state": new_state}
+        sqlite_tx(con, [(update, args), self.log_cmd()])
 
 
 TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag, "log": Record}
@@ -165,7 +178,7 @@ class QueryStuff(NamedTuple):
         return SPACE.join(parts)
 
     def execute(self, con: Connection) -> list[Stuff]:
-        cur = sqlite_execute(con, self.cmd(), self._asdict())
+        cur = sqlite_query(con, self.cmd(), self._asdict())
         return [Stuff(*row) for row in cur.fetchall()]
 
 
@@ -181,7 +194,7 @@ class QueryTags(NamedTuple):
                                "ORDER BY id DESC LIMIT :limit"])
 
     def execute(self, con: Connection) -> list[Tag]:
-        cur = sqlite_execute(con, self.cmd(), self._asdict())
+        cur = sqlite_query(con, self.cmd(), self._asdict())
         return [Tag(*row) for row in cur.fetchall()]
 
 

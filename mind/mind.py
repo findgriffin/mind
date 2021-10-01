@@ -6,6 +6,7 @@ from sqlite3 import Connection, Cursor
 from textwrap import wrap, shorten
 from typing import NamedTuple, Callable, Optional, NewType, Union
 import argparse
+import hashlib
 import logging
 import sqlite3
 import sys
@@ -23,6 +24,7 @@ STUFF = "stuff"
 TAG = "tag"
 TAGS = "tags"
 TAG_PREFIX = "#"
+UTF8 = "utf-8"
 PAGE_SIZE = 9
 VIEW_WIDTH = 80
 H_RULE = "-" * VIEW_WIDTH
@@ -113,7 +115,10 @@ class Stuff(NamedTuple):
         """Returns the unix epoch of this stuff in seconds, as an integer."""
         return int(self.id * 1e-6)
 
-    def human_id(self):
+    def full_id(self):
+        return hex(self.id)[2:]
+
+    def created(self):
         return datetime.fromtimestamp(self.epoch()).isoformat()[:16]
 
     def preview(self, width=40):
@@ -123,14 +128,14 @@ class Stuff(NamedTuple):
     def show(self, tags=[]) -> list[str]:
         tag_names = [tag.tag for tag in tags]
         tag_names.sort()
-        return [f"Stuff [{self.human_id()}]", H_RULE,
+        return [f"Stuff [{self.created()}]", H_RULE,
                 "Tags: " + ", ".join(tag_names), H_RULE, self.body]
 
     def __str__(self):
-        return f"{self.human_id()} -> {self.preview()}"
+        return f"{self.created()} -> {self.preview()}"
 
     def __repr__(self):
-        return f"Stuff[{hex(self.id)[2:]} -> {self.preview(width=30)}]"
+        return f"Stuff[{self.full_id()} -> {self.preview(width=30)}]"
 
     def log_cmd(self) -> tuple[str, dict]:
         stmt = "INSERT INTO log(stuff, before) VALUES (:stuff, :before)"
@@ -341,9 +346,20 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
     return ["Not implemented yet."]
 
 
+def hash_stuff(stuff, tags):
+    sha = hashlib.sha1()
+    tags.sort()
+    canonical = "[{},{}][{}]".format(
+        stuff.full_id(), stuff.body, ",".join(tags))
+    logging.debug(f"Canonical: {canonical}")
+    sha.update(canonical.encode(UTF8))
+    return sha.hexdigest()
+
+
 def add_content(con: Connection, content: list[str]) -> list[str]:
     stuff, tags = new_stuff(content)
-    logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
+    hash = hash_stuff(stuff, tags)
+    logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")
     ops: list[Operation] = [(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)]
     insert_tag = f"INSERT INTO {TAGS} VALUES (?, ?)"
     ops.extend(list(map(lambda t: ((insert_tag, (stuff.id, t))), tags)))

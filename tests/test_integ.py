@@ -32,9 +32,7 @@ class TestInteg(unittest.TestCase):
         self.assertIn(" -> # This is how you Markdown", output[0])
         self.assertTrue(output[0].endswith("tags[markdown, nohello]"))
 
-    def test_schema_v1(self):
-        # Given
-        path = Path("tests/data/schema-v1.db")
+    def verify_old_schema_breaks(self, path):
         # When
         with self.assertRaises(RuntimeError) as context:
             with mind.get_db(path, strict=True) as con:
@@ -43,22 +41,19 @@ class TestInteg(unittest.TestCase):
         # Then
         self.assertIn("Error for table", str(context.exception))
         self.assertIn("Found: ", str(context.exception))
+
+    def test_schema_v1(self):
+        self.verify_old_schema_breaks(Path("tests/data/schema-v1.db"))
 
     def test_schema_v2(self):
-        # Given
-        path = Path("tests/data/schema-v2.db")
-        # When
-        with self.assertRaises(RuntimeError) as context:
-            with mind.get_db(path, strict=True) as con:
-                mind.QueryStuff().execute(con)
-            con.close()
-        # Then
-        self.assertIn("Error for table", str(context.exception))
-        self.assertIn("Found: ", str(context.exception))
+        self.verify_old_schema_breaks(Path("tests/data/schema-v2.db"))
 
     def test_schema_v3(self):
+        self.verify_old_schema_breaks(Path("tests/data/schema-v3.db"))
+
+    def test_schema_v4(self):
         # Given
-        path = Path("tests/data/schema-v3.db")
+        path = Path("tests/data/schema-v4.db")
         # When
         with mind.get_db(path, strict=True) as con:
             mind.QueryStuff().execute(con)

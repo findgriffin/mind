@@ -132,18 +132,18 @@ class Stuff(NamedTuple):
         return [f"Stuff [{self.created()}]", H_RULE,
                 "Tags: " + ", ".join(tag_names), H_RULE, self.body]
 
-    def create_hash(self, tags: list[str]):
+    def calc_create_hash(self, base, tags: list[str]):
         sha = hashlib.sha1()
         tags.sort()
-        canonical = "[{},{}][{}]".format(
-            self.full_id(), self.body, ",".join(tags))
+        canonical = "[{}][{},{}][{}]".format(
+            base, self.full_id(), self.body, ",".join(tags))
         logging.debug(f"Canonical: {canonical}")
         sha.update(canonical.encode(UTF8))
         return sha.hexdigest()
 
-    def create_update_hash(self, new_state: State):
+    def calc_update_hash(self, base, new_state: State):
         sha = hashlib.sha1()
-        canonical = f"[{self.full_id()},{self.state}->{new_state}"
+        canonical = f"[{base}][{self.full_id()},{self.state}->{new_state}"
         logging.debug(f"Canonical: {canonical}")
         sha.update(canonical.encode(UTF8))
         return sha.hexdigest()
@@ -156,7 +156,7 @@ class Stuff(NamedTuple):
 
     def update_state(self, con, new_state: State) -> None:
         sn_0, hash_0 = previous(con)
-        hash = self.create_update_hash(new_state)
+        hash = self.calc_update_hash(hash_0, new_state)
         insert_stmt = "INSERT INTO log (sn,stuff,before,hash) VALUES (?,?,?,?)"
         ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
                                 {"id": self.id, "state": new_state}),
@@ -341,7 +341,6 @@ def do_state_change(con: Connection, args: list[str],
                     state: State) -> list[str]:
     id = parse_item(args)
     stuff = QueryStuff(limit=1, offset=id-1).execute(con)
-    sn_0, hash_0 = previous(con)
     if len(stuff) == 1:
         stuff[0].update_state(con, state)
         return [f"{state.name.capitalize()}: {stuff[0]}"]
@@ -376,7 +375,7 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
 def add_content(con: Connection, content: list[str]) -> list[str]:
     stuff, tags = new_stuff(content)
     sn_0, hash_0 = previous(con)
-    hash = stuff.create_hash(tags)
+    hash = stuff.calc_create_hash(hash_0, tags)
     logging.debug(f"Found previous: {sn_0} {hash_0}")
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")
     ops: list[Operation] = [(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)]

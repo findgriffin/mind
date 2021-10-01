@@ -69,6 +69,7 @@ TYPE_MAP: dict[type, SQLiteType] = {
 
 class Record(NamedTuple):
     sn: Sequence
+    hash: str
     stuff: int
     before: State
 
@@ -131,20 +132,37 @@ class Stuff(NamedTuple):
         return [f"Stuff [{self.created()}]", H_RULE,
                 "Tags: " + ", ".join(tag_names), H_RULE, self.body]
 
+    def create_hash(self, tags: list[str]):
+        sha = hashlib.sha1()
+        tags.sort()
+        canonical = "[{},{}][{}]".format(
+            self.full_id(), self.body, ",".join(tags))
+        logging.debug(f"Canonical: {canonical}")
+        sha.update(canonical.encode(UTF8))
+        return sha.hexdigest()
+
+    def create_update_hash(self, new_state: State):
+        sha = hashlib.sha1()
+        canonical = f"[{self.full_id()},{self.state}->{new_state}"
+        logging.debug(f"Canonical: {canonical}")
+        sha.update(canonical.encode(UTF8))
+        return sha.hexdigest()
+
     def __str__(self):
         return f"{self.created()} -> {self.preview()}"
 
     def __repr__(self):
         return f"Stuff[{self.full_id()} -> {self.preview(width=30)}]"
 
-    def log_cmd(self) -> tuple[str, dict]:
-        stmt = "INSERT INTO log(stuff, before) VALUES (:stuff, :before)"
-        return (stmt, {"stuff": self.id, "before": self.state})
-
-    def update_state(self, con, new_state) -> None:
-        update = "UPDATE stuff SET state=:state WHERE id=:id"
-        args = {"id": self.id, "state": new_state}
-        sqlite_tx(con, [(update, args), self.log_cmd()])
+    def update_state(self, con, new_state: State) -> None:
+        sn_0, hash_0 = previous(con)
+        hash = self.create_update_hash(new_state)
+        insert_stmt = "INSERT INTO log (sn,stuff,before,hash) VALUES (?,?,?,?)"
+        ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
+                                {"id": self.id, "state": new_state}),
+                                (insert_stmt,
+                                (sn_0+1, self.id, self.state, hash))]
+        sqlite_tx(con, ops)
 
 
 TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag, "log": Record}
@@ -202,6 +220,14 @@ class QueryTags(NamedTuple):
     def execute(self, con: Connection) -> list[Tag]:
         cur = sqlite_query(con, self.cmd(), self._asdict())
         return [Tag(*row) for row in cur.fetchall()]
+
+
+def previous(con: Connection) -> tuple:
+    cmd = "SELECT sn, hash FROM log ORDER BY sn DESC LIMIT 1"
+    previous = sqlite_query(con, cmd, ()).fetchone()
+    if previous:
+        return previous
+    return (0, "")
 
 
 def build_create_table_cmd(table_name: str, schema) -> str:
@@ -315,6 +341,7 @@ def do_state_change(con: Connection, args: list[str],
                     state: State) -> list[str]:
     id = parse_item(args)
     stuff = QueryStuff(limit=1, offset=id-1).execute(con)
+    sn_0, hash_0 = previous(con)
     if len(stuff) == 1:
         stuff[0].update_state(con, state)
         return [f"{state.name.capitalize()}: {stuff[0]}"]
@@ -346,25 +373,18 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
     return ["Not implemented yet."]
 
 
-def hash_stuff(stuff, tags):
-    sha = hashlib.sha1()
-    tags.sort()
-    canonical = "[{},{}][{}]".format(
-        stuff.full_id(), stuff.body, ",".join(tags))
-    logging.debug(f"Canonical: {canonical}")
-    sha.update(canonical.encode(UTF8))
-    return sha.hexdigest()
-
-
 def add_content(con: Connection, content: list[str]) -> list[str]:
     stuff, tags = new_stuff(content)
-    hash = hash_stuff(stuff, tags)
+    sn_0, hash_0 = previous(con)
+    hash = stuff.create_hash(tags)
+    logging.debug(f"Found previous: {sn_0} {hash_0}")
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")
     ops: list[Operation] = [(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)]
     insert_tag = f"INSERT INTO {TAGS} VALUES (?, ?)"
     ops.extend(list(map(lambda t: ((insert_tag, (stuff.id, t))), tags)))
-    ops.append(("INSERT INTO log (stuff, before) VALUES (?, ?)",
-                (stuff.id, State.ABSENT)))
+    ops.append((
+        "INSERT INTO log (sn, stuff, before, hash) VALUES (?, ?, ?, ?)",
+        (sn_0+1, stuff.id, State.ABSENT, hash)))
     sqlite_tx(con, ops)
     return [f"Added {stuff} tags[{', '.join(tags)}]"]
 

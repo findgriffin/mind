@@ -52,6 +52,12 @@ class SQLiteType(Enum):
     TEXT = "TEXT"
 
 
+def insert(table: str, row):
+    cols = ", ".join(row._fields)
+    vals = ", ".join([":" + f for f in row._fields])
+    return f"INSERT INTO {table} ({cols}) VALUES ({vals})"
+
+
 Sequence = NewType('Sequence', int)
 
 
@@ -157,11 +163,10 @@ class Stuff(NamedTuple):
     def update_state(self, con, new_state: State) -> None:
         sn_0, hash_0 = previous(con)
         hash = self.calc_update_hash(hash_0, new_state)
-        insert_stmt = "INSERT INTO log (sn,stuff,before,hash) VALUES (?,?,?,?)"
+        rcd = Record(sn_0+1, stuff=self.id, before=self.state, hash=hash)
         ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
                                 {"id": self.id, "state": new_state}),
-                                (insert_stmt,
-                                (sn_0+1, self.id, self.state, hash))]
+                                (insert("log", rcd), rcd._asdict())]
         sqlite_tx(con, ops)
 
 
@@ -378,12 +383,12 @@ def add_content(con: Connection, content: list[str]) -> list[str]:
     hash = stuff.calc_create_hash(hash_0, tags)
     logging.debug(f"Found previous: {sn_0} {hash_0}")
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")
-    ops: list[Operation] = [(f"INSERT INTO {STUFF} VALUES (?, ?, ?)", stuff)]
-    insert_tag = f"INSERT INTO {TAGS} VALUES (?, ?)"
-    ops.extend(list(map(lambda t: ((insert_tag, (stuff.id, t))), tags)))
-    ops.append((
-        "INSERT INTO log (sn, stuff, before, hash) VALUES (?, ?, ?, ?)",
-        (sn_0+1, stuff.id, State.ABSENT, hash)))
+    ops: list[Operation] = [(insert(STUFF, stuff), stuff._asdict())]
+    for tag_name in tags:
+        tag = Tag(id=stuff.id, tag=tag_name)
+        ops.append((insert(TAGS, tag), tag._asdict()))
+    record = Record(sn=sn_0+1, stuff=stuff.id, before=State.ABSENT, hash=hash)
+    ops.append((insert("log", record), record._asdict()))
     sqlite_tx(con, ops)
     return [f"Added {stuff} tags[{', '.join(tags)}]"]
 

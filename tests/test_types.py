@@ -17,5 +17,6 @@ class TestTypes(unittest.TestCase):
         cmd = mind.build_create_table_cmd("stuffs", mind.Stuff)
         # Then
         self.assertEqual("CREATE TABLE stuffs(id INTEGER NOT NULL, "
-                         "body TEXT NOT NULL, state INTEGER NOT NULL, "
+                         "body TEXT NOT NULL, state INTEGER NOT NULL CHECK ("
+                         "state BETWEEN 1 AND 4), "
                          "PRIMARY KEY (id))", cmd)

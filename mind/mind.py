@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 from datetime import datetime
-from enum import Enum
+from enum import IntEnum
 from pathlib import Path
 from sqlite3 import Connection, Cursor
 from textwrap import wrap, shorten
@@ -30,26 +30,9 @@ VIEW_WIDTH = 80
 H_RULE = "-" * VIEW_WIDTH
 
 
-class State(Enum):
-    ABSENT = -1
-    ACTIVE = 0
-    DONE = 1
-    HIDDEN = 2
-
-    def __repr__(self):
-        return f"{self.name}({self.value})"
-
-
+State = IntEnum("State", "ABSENT ACTIVE DONE HIDDEN")
 sqlite3.register_adapter(State, lambda s: s.value)
-
-
-class SQLiteType(Enum):
-    BLOB = "BLOB"
-    INTEGER = "INTEGER"
-    NULL = "NULL"
-    REAL = "REAL"
-    SEQUENCE = "INTEGER PRIMARY KEY AUTOINCREMENT"
-    TEXT = "TEXT"
+Sequence = NewType('Sequence', int)
 
 
 def insert(table: str, row):
@@ -58,18 +41,15 @@ def insert(table: str, row):
     return f"INSERT INTO {table} ({cols}) VALUES ({vals})"
 
 
-Sequence = NewType('Sequence', int)
-
-
 # None / Null not included here as there are no optional columns (yet)
 # Optional[int|str] could be mapped to removing the 'NOT NULL' constraint
-TYPE_MAP: dict[type, SQLiteType] = {
-    State: SQLiteType.INTEGER,
-    Sequence: SQLiteType.SEQUENCE,
-    int:    SQLiteType.INTEGER,
-    float:  SQLiteType.REAL,
-    str:    SQLiteType.TEXT,
-    bytes:  SQLiteType.BLOB
+TYPE_MAP: dict[type, Callable[[str], str]] = {
+    State: lambda n: f"INTEGER NOT NULL CHECK ({n} BETWEEN 1 AND 4)",
+    Sequence: lambda n: "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL",
+    int: lambda n: "INTEGER NOT NULL",
+    float: lambda n: "REAL NOT NULL",
+    str: lambda n: "TEXT NOT NULL",
+    bytes: lambda n: "BLOB NOT NULL"
 }
 
 
@@ -237,10 +217,9 @@ def previous(con: Connection) -> tuple:
 
 def build_create_table_cmd(table_name: str, schema) -> str:
     columns = []
-    for annotation in schema.__annotations__.items():
-        name = annotation[0]
-        sqlite_type = TYPE_MAP[annotation[1]].value
-        columns.append(f"{name} {sqlite_type} NOT NULL")
+    for column in schema.__annotations__.items():
+        name = column[0]
+        columns.append(SPACE.join((name, TYPE_MAP[column[1]](column[0]))))
     const = schema.constraints()
     c_clauses = ", " + ", ".join(const) if const else ""
     return f"CREATE TABLE {table_name}({', '.join(columns)}{c_clauses})"

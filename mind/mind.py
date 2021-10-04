@@ -12,14 +12,11 @@ import sqlite3
 import sys
 
 
-ID = "id"
-BODY = "body"
 CLEAN = "clean"
 CMD = "cmd"
 DEFAULT_DB = "~/.mind.db"
 NEWLINE = "\n"
 SPACE = " "
-STATE = "state"
 STUFF = "stuff"
 TAG = "tag"
 TAGS = "tags"
@@ -150,7 +147,7 @@ class Stuff(NamedTuple):
         sqlite_tx(con, ops)
 
 
-TABLES: dict[str, type] = {"stuff": Stuff, "tags": Tag, "log": Record}
+TABLES: dict[str, type] = {STUFF: Stuff, TAGS: Tag, "log": Record}
 
 
 def parse_item(args: list[str]) -> int:

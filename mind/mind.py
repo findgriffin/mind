@@ -30,6 +30,8 @@ H_RULE = "-" * VIEW_WIDTH
 State = IntEnum("State", "ABSENT ACTIVE DONE HIDDEN")
 sqlite3.register_adapter(State, lambda s: s.value)
 Sequence = NewType('Sequence', int)
+Params = Union[dict, tuple]
+Operation = tuple[str, Params]
 
 
 def insert(table: str, row):
@@ -68,10 +70,6 @@ class Tag(NamedTuple):
     @classmethod
     def constraints(self) -> list[str]:
         return []
-
-
-Params = Union[dict, tuple]
-Operation = tuple[str, Params]
 
 
 class Stuff(NamedTuple):
@@ -165,6 +163,13 @@ class Mind():
             logging.debug("Entered transaction.")
             [self.query(*op) for op in operations]
 
+    def head(self) -> tuple:
+        cmd = "SELECT sn, hash FROM log ORDER BY sn DESC LIMIT 1"
+        previous = self.query(cmd, ()).fetchone()
+        if previous:
+            return previous
+        return (0, "")
+
 
 def parse_item(args: list[str]) -> int:
     if len(args) != 1:
@@ -218,14 +223,6 @@ class QueryTags(NamedTuple):
     def execute(self, mind: Mind) -> list[Tag]:
         cur = mind.query(self.cmd(), self._asdict())
         return [Tag(*row) for row in cur.fetchall()]
-
-
-def previous(mind: Mind) -> tuple:
-    cmd = "SELECT sn, hash FROM log ORDER BY sn DESC LIMIT 1"
-    previous = mind.query(cmd, ()).fetchone()
-    if previous:
-        return previous
-    return (0, "")
 
 
 def build_create_table_cmd(table_name: str, schema) -> str:
@@ -314,7 +311,7 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
 
 
 def update_state(stuff: Stuff, mind: Mind, new_state: State) -> None:
-    sn_0, hash_0 = previous(mind)
+    sn_0, hash_0 = mind.head()
     hash = stuff.calc_update_hash(hash_0, new_state)
     rcd = Record(sn_0+1, stuff=stuff.id, before=stuff.state, hash=hash)
     ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
@@ -360,7 +357,7 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
 
 def add_content(mind: Mind, content: list[str]) -> list[str]:
     stuff, tags = new_stuff(content)
-    sn_0, hash_0 = previous(mind)
+    sn_0, hash_0 = mind.head()
     hash = stuff.calc_create_hash(hash_0, tags)
     logging.debug(f"Found previous: {sn_0} {hash_0}")
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")

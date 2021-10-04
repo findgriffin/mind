@@ -124,7 +124,12 @@ class Stuff(NamedTuple):
         return f"{self.created()} -> {self.preview()}"
 
     def __repr__(self):
-        return f"Stuff[{self.full_id()} -> {self.preview(width=30)}]"
+        return f"Stuff[{self.full_id()},{self.state.name},{self.body}]"
+
+    def hash(self):
+        sha = hashlib.sha1()
+        sha.update(self.__repr__())
+        return sha.hexdigest()
 
 
 class Mind():

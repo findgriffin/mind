@@ -62,6 +62,9 @@ class Record(NamedTuple):
     def constraints(self) -> list[str]:
         return []
 
+    def next(self):
+        return Sequence(self.sn + 1)
+
 
 class Tag(NamedTuple):
     id: int
@@ -163,12 +166,13 @@ class Mind():
             logging.debug("Entered transaction.")
             [self.query(*op) for op in operations]
 
-    def head(self) -> tuple:
-        cmd = "SELECT sn, hash FROM log ORDER BY sn DESC LIMIT 1"
+    def head(self) -> Record:
+        cmd = "SELECT sn, hash, stuff, before FROM log ORDER BY sn DESC " \
+              "LIMIT 1"
         previous = self.query(cmd, ()).fetchone()
         if previous:
-            return previous
-        return (0, "")
+            return Record(*previous)
+        return Record(Sequence(1), "", 0, State.ABSENT)
 
 
 def parse_item(args: list[str]) -> int:
@@ -311,9 +315,9 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
 
 
 def update_state(stuff: Stuff, mind: Mind, new_state: State) -> None:
-    sn_0, hash_0 = mind.head()
-    hash = stuff.calc_update_hash(hash_0, new_state)
-    rcd = Record(sn_0+1, stuff=stuff.id, before=stuff.state, hash=hash)
+    head = mind.head()
+    hash = stuff.calc_update_hash(head.hash, new_state)
+    rcd = Record(head.next(), stuff=stuff.id, before=stuff.state, hash=hash)
     ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
                              {"id": stuff.id, "state": new_state}),
                             (insert("log", rcd), rcd._asdict())]
@@ -357,15 +361,15 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
 
 def add_content(mind: Mind, content: list[str]) -> list[str]:
     stuff, tags = new_stuff(content)
-    sn_0, hash_0 = mind.head()
-    hash = stuff.calc_create_hash(hash_0, tags)
-    logging.debug(f"Found previous: {sn_0} {hash_0}")
+    head = mind.head()
+    hash = stuff.calc_create_hash(head.hash, tags)
+    logging.debug(f"Found previous: {head.sn} {head.hash}")
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")
     ops: list[Operation] = [(insert(STUFF, stuff), stuff._asdict())]
     for tag_name in tags:
         tag = Tag(id=stuff.id, tag=tag_name)
         ops.append((insert(TAGS, tag), tag._asdict()))
-    record = Record(sn=sn_0+1, stuff=stuff.id, before=State.ABSENT, hash=hash)
+    record = Record(head.next(), hash, stuff.id, State.ABSENT)
     ops.append((insert("log", record), record._asdict()))
     mind.tx(ops)
     return [f"Added {stuff} tags[{', '.join(tags)}]"]

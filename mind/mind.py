@@ -74,16 +74,43 @@ Params = Union[dict, tuple]
 Operation = tuple[str, Params]
 
 
-def sqlite_query(con: Connection, sql: str, params: Params) -> Cursor:
-    logging.debug(f"Executing SQL   :{sql}")
-    logging.debug(f"Executing PARAMS:{params}")
-    return con.execute(sql, params)
+class Mind():
 
+    def __init__(self, filename: str, strict: bool = False) -> None:
+        path = Path(filename).expanduser()
+        exists = path.exists()
+        logging.debug(f"Opening DB {path}, exists: {path.exists()}")
+        with sqlite3.connect(path) as con:
+            for name, schema in TABLES.items():
+                create_cmd = build_create_table_cmd(name, schema)
+                if exists:
+                    row = con.execute("SELECT * FROM sqlite_master WHERE "
+                                      "name=?", [name]).fetchone()
+                    if not row or row[4] != create_cmd:
+                        msg = f"Error for table {name}. Found: {row}"
+                        logging.debug(msg)
+                        if strict:
+                            raise RuntimeError(msg)
+                else:
+                    con.execute(create_cmd)
+        con.execute("PRAGMA foreign_keys = ON")
+        self.con = con
 
-def sqlite_tx(con: Connection, operations: list[Operation]) -> None:
-    with con:
-        logging.debug("Entered transaction.")
-        [sqlite_query(con, *op) for op in operations]
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_details):
+        self.con.close()
+
+    def query(self, sql: str, params: Params) -> Cursor:
+        logging.debug(f"Executing SQL   :{sql}")
+        logging.debug(f"Executing PARAMS:{params}")
+        return self.con.execute(sql, params)
+
+    def tx(self, operations: list[Operation]) -> None:
+        with self.con:
+            logging.debug("Entered transaction.")
+            [self.query(*op) for op in operations]
 
 
 class Stuff(NamedTuple):
@@ -137,14 +164,14 @@ class Stuff(NamedTuple):
     def __repr__(self):
         return f"Stuff[{self.full_id()} -> {self.preview(width=30)}]"
 
-    def update_state(self, con, new_state: State) -> None:
-        sn_0, hash_0 = previous(con)
+    def update_state(self, mind: Mind, new_state: State) -> None:
+        sn_0, hash_0 = previous(mind)
         hash = self.calc_update_hash(hash_0, new_state)
         rcd = Record(sn_0+1, stuff=self.id, before=self.state, hash=hash)
         ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
                                 {"id": self.id, "state": new_state}),
                                 (insert("log", rcd), rcd._asdict())]
-        sqlite_tx(con, ops)
+        mind.tx(ops)
 
 
 TABLES: dict[str, type] = {STUFF: Stuff, TAGS: Tag, "log": Record}
@@ -183,8 +210,8 @@ class QueryStuff(NamedTuple):
         parts.append("LIMIT :limit OFFSET :offset")
         return SPACE.join(parts)
 
-    def execute(self, con: Connection) -> list[Stuff]:
-        cur = sqlite_query(con, self.cmd(), self._asdict())
+    def execute(self, mind: Mind) -> list[Stuff]:
+        cur = mind.query(self.cmd(), self._asdict())
         return [Stuff(*row) for row in cur.fetchall()]
 
 
@@ -199,14 +226,14 @@ class QueryTags(NamedTuple):
             return SPACE.join(["SELECT MAX(id), tag FROM tags GROUP BY tag",
                                "ORDER BY id DESC LIMIT :limit"])
 
-    def execute(self, con: Connection) -> list[Tag]:
-        cur = sqlite_query(con, self.cmd(), self._asdict())
+    def execute(self, mind: Mind) -> list[Tag]:
+        cur = mind.query(self.cmd(), self._asdict())
         return [Tag(*row) for row in cur.fetchall()]
 
 
-def previous(con: Connection) -> tuple:
+def previous(mind: Mind) -> tuple:
     cmd = "SELECT sn, hash FROM log ORDER BY sn DESC LIMIT 1"
-    previous = sqlite_query(con, cmd, ()).fetchone()
+    previous = mind.query(cmd, ()).fetchone()
     if previous:
         return previous
     return (0, "")
@@ -220,27 +247,6 @@ def build_create_table_cmd(table_name: str, schema) -> str:
     const = schema.constraints()
     c_clauses = ", " + ", ".join(const) if const else ""
     return f"CREATE TABLE {table_name}({', '.join(columns)}{c_clauses})"
-
-
-def get_db(filename: str = DEFAULT_DB, strict: bool = False) -> Connection:
-    path = Path(filename).expanduser()
-    exists = path.exists()
-    logging.debug(f"Opening DB {path}, exists: {path.exists()}")
-    with sqlite3.connect(path) as con:
-        for name, schema in TABLES.items():
-            create_cmd = build_create_table_cmd(name, schema)
-            if exists:
-                row = con.execute("SELECT * FROM sqlite_master WHERE "
-                                  "name=?", [name]).fetchone()
-                if not row or row[4] != create_cmd:
-                    msg = f"Error for table {name}. Found: {row}"
-                    logging.debug(msg)
-                    if strict:
-                        raise RuntimeError(msg)
-            else:
-                con.execute(create_cmd)
-    con.execute("PRAGMA foreign_keys = ON")
-    return con
 
 
 def is_tag(word: str) -> Optional[str]:
@@ -291,7 +297,7 @@ def order_and_filter(args: argparse.Namespace) -> tuple[bool, Optional[str]]:
         return latest, None
 
 
-def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
+def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
     latest, filter = order_and_filter(args)
     logging.debug(f"Listing latest: {latest} filter: {filter}")
     filter_desc = "ALL"
@@ -299,9 +305,9 @@ def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
         parsed = parse_filter(filter)
         filter_desc = "=".join(parsed)
         fetched = QueryStuff(latest=latest, tag=parsed[1],
-                             limit=args.num+1).execute(con)
+                             limit=args.num+1).execute(mind)
     else:
-        fetched = QueryStuff(latest=latest, limit=args.num+1).execute(con)
+        fetched = QueryStuff(latest=latest, limit=args.num+1).execute(mind)
     noun = "latest" if latest else "oldest"
     output = [f" # Currently minding [{noun}] [{filter_desc}] "
               f"[num={args.num}]...", H_RULE]
@@ -312,18 +318,18 @@ def do_list(con: Connection, args: argparse.Namespace) -> list[str]:
         output.append("  Hmm, couldn't find anything here.")
     if len(fetched) > args.num:
         output.append("    And more...")
-    tags = ", ".join([t.tag for t in QueryTags(id=None).execute(con)])
+    tags = ", ".join([t.tag for t in QueryTags(id=None).execute(mind)])
     wrapped = wrap(f"Latest tags: {tags}", initial_indent="  ",
                    subsequent_indent=" " * 15)
     return output + [H_RULE] + wrapped + [H_RULE]
 
 
-def do_state_change(con: Connection, args: list[str],
+def do_state_change(mind: Mind, args: list[str],
                     state: State) -> list[str]:
     id = parse_item(args)
-    stuff = QueryStuff(limit=1, offset=id-1).execute(con)
+    stuff = QueryStuff(limit=1, offset=id-1).execute(mind)
     if len(stuff) == 1:
-        stuff[0].update_state(con, state)
+        stuff[0].update_state(mind, state)
         return [f"{state.name.capitalize()}: {stuff[0]}"]
     elif len(stuff) == 0:
         return([f"Unable to find stuff: [{id}]"])
@@ -331,20 +337,20 @@ def do_state_change(con: Connection, args: list[str],
         raise RuntimeError(f"Query for 1 row returned {len(stuff)} rows.")
 
 
-def do_forget(con: Connection, args: argparse.Namespace) -> list[str]:
-    return do_state_change(con, args.forget, State.HIDDEN)
+def do_forget(mind: Mind, args: argparse.Namespace) -> list[str]:
+    return do_state_change(mind, args.forget, State.HIDDEN)
 
 
-def do_tick(con: Connection, args: argparse.Namespace) -> list[str]:
-    return do_state_change(con, args.tick, State.DONE)
+def do_tick(mind: Mind, args: argparse.Namespace) -> list[str]:
+    return do_state_change(mind, args.tick, State.DONE)
 
 
-def do_show(con: Connection, args: argparse.Namespace) -> list[str]:
+def do_show(mind: Mind, args: argparse.Namespace) -> list[str]:
     id = parse_item(args.show)
-    rows = QueryStuff(limit=1, offset=id-1).execute(con)
+    rows = QueryStuff(limit=1, offset=id-1).execute(mind)
     any(map(lambda r: logging.debug(f"Returned row: {r.__repr__()}"), rows))
     if rows:
-        return rows[0].show(QueryTags(id=rows[0].id).execute(con))
+        return rows[0].show(QueryTags(id=rows[0].id).execute(mind))
     else:
         return [f"Stuff [{id}] not found."]
 
@@ -353,9 +359,9 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
     return ["Not implemented yet."]
 
 
-def add_content(con: Connection, content: list[str]) -> list[str]:
+def add_content(mind: Mind, content: list[str]) -> list[str]:
     stuff, tags = new_stuff(content)
-    sn_0, hash_0 = previous(con)
+    sn_0, hash_0 = previous(mind)
     hash = stuff.calc_create_hash(hash_0, tags)
     logging.debug(f"Found previous: {sn_0} {hash_0}")
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")
@@ -365,15 +371,15 @@ def add_content(con: Connection, content: list[str]) -> list[str]:
         ops.append((insert(TAGS, tag), tag._asdict()))
     record = Record(sn=sn_0+1, stuff=stuff.id, before=State.ABSENT, hash=hash)
     ops.append((insert("log", record), record._asdict()))
-    sqlite_tx(con, ops)
+    mind.tx(ops)
     return [f"Added {stuff} tags[{', '.join(tags)}]"]
 
 
-def do_add(con: Connection, args: argparse.Namespace) -> list[str]:
+def do_add(mind: Mind, args: argparse.Namespace) -> list[str]:
     if args.text:
-        return add_content(con, [args.text])
+        return add_content(mind, [args.text])
     elif args.file:
-        return add_content(con, Path(args.file).read_text().splitlines())
+        return add_content(mind, Path(args.file).read_text().splitlines())
     elif args.interactive:
         raise NotImplementedError
     else:
@@ -422,13 +428,12 @@ COMMANDS = {
 
 def run(args: argparse.Namespace) -> list[str]:
     logging.debug(f"Running with arguments: {args}")
-    with get_db(args.db) as con:
+    with Mind(args.db) as mind:
         if args.cmd in COMMANDS:
-            return COMMANDS[args.cmd].do(con, args)
+            return COMMANDS[args.cmd].do(mind, args)
         else:
             args.num = PAGE_SIZE
-            return do_list(con, args)
-    con.close()
+            return do_list(mind, args)
 
 
 def setup_logging(verbose: bool = False):

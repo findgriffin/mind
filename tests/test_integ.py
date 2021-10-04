@@ -35,9 +35,8 @@ class TestInteg(unittest.TestCase):
     def verify_old_schema_breaks(self, path):
         # When
         with self.assertRaises(RuntimeError) as context:
-            with mind.get_db(path, strict=True) as con:
-                mind.QueryStuff().execute(con)
-            con.close()
+            with mind.Mind(path, strict=True) as sesh:
+                mind.QueryStuff().execute(sesh)
         # Then
         self.assertIn("Error for table", str(context.exception))
         self.assertIn("Found: ", str(context.exception))
@@ -58,7 +57,6 @@ class TestInteg(unittest.TestCase):
         # Given
         path = Path("tests/data/schema-v5.db")
         # When
-        with mind.get_db(path, strict=True) as con:
-            mind.QueryStuff().execute(con)
+        with mind.Mind(path, strict=True) as sesh:
+            mind.QueryStuff().execute(sesh)
         # Then
-        con.close()

@@ -74,45 +74,6 @@ Params = Union[dict, tuple]
 Operation = tuple[str, Params]
 
 
-class Mind():
-
-    def __init__(self, filename: str, strict: bool = False) -> None:
-        path = Path(filename).expanduser()
-        exists = path.exists()
-        logging.debug(f"Opening DB {path}, exists: {path.exists()}")
-        with sqlite3.connect(path) as con:
-            for name, schema in TABLES.items():
-                create_cmd = build_create_table_cmd(name, schema)
-                if exists:
-                    row = con.execute("SELECT * FROM sqlite_master WHERE "
-                                      "name=?", [name]).fetchone()
-                    if not row or row[4] != create_cmd:
-                        msg = f"Error for table {name}. Found: {row}"
-                        logging.debug(msg)
-                        if strict:
-                            raise RuntimeError(msg)
-                else:
-                    con.execute(create_cmd)
-        con.execute("PRAGMA foreign_keys = ON")
-        self.con = con
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_details):
-        self.con.close()
-
-    def query(self, sql: str, params: Params) -> Cursor:
-        logging.debug(f"Executing SQL   :{sql}")
-        logging.debug(f"Executing PARAMS:{params}")
-        return self.con.execute(sql, params)
-
-    def tx(self, operations: list[Operation]) -> None:
-        with self.con:
-            logging.debug("Entered transaction.")
-            [self.query(*op) for op in operations]
-
-
 class Stuff(NamedTuple):
     id: int     # Epoch (in microseconds), ms was too course for tests.
     body: str
@@ -164,17 +125,45 @@ class Stuff(NamedTuple):
     def __repr__(self):
         return f"Stuff[{self.full_id()} -> {self.preview(width=30)}]"
 
-    def update_state(self, mind: Mind, new_state: State) -> None:
-        sn_0, hash_0 = previous(mind)
-        hash = self.calc_update_hash(hash_0, new_state)
-        rcd = Record(sn_0+1, stuff=self.id, before=self.state, hash=hash)
-        ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
-                                {"id": self.id, "state": new_state}),
-                                (insert("log", rcd), rcd._asdict())]
-        mind.tx(ops)
 
+class Mind():
+    tables: dict[str, type] = {STUFF: Stuff, TAGS: Tag, "log": Record}
 
-TABLES: dict[str, type] = {STUFF: Stuff, TAGS: Tag, "log": Record}
+    def __init__(self, filename: str, strict: bool = False) -> None:
+        path = Path(filename).expanduser()
+        exists = path.exists()
+        logging.debug(f"Opening DB {path}, exists: {path.exists()}")
+        with sqlite3.connect(path) as con:
+            for name, schema in self.tables.items():
+                create_cmd = build_create_table_cmd(name, schema)
+                if exists:
+                    row = con.execute("SELECT * FROM sqlite_master WHERE "
+                                      "name=?", [name]).fetchone()
+                    if not row or row[4] != create_cmd:
+                        msg = f"Error for table {name}. Found: {row}"
+                        logging.debug(msg)
+                        if strict:
+                            raise RuntimeError(msg)
+                else:
+                    con.execute(create_cmd)
+        con.execute("PRAGMA foreign_keys = ON")
+        self.con = con
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_details):
+        self.con.close()
+
+    def query(self, sql: str, params: Params) -> Cursor:
+        logging.debug(f"Executing SQL   :{sql}")
+        logging.debug(f"Executing PARAMS:{params}")
+        return self.con.execute(sql, params)
+
+    def tx(self, operations: list[Operation]) -> None:
+        with self.con:
+            logging.debug("Entered transaction.")
+            [self.query(*op) for op in operations]
 
 
 def parse_item(args: list[str]) -> int:
@@ -324,12 +313,22 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
     return output + [H_RULE] + wrapped + [H_RULE]
 
 
+def update_state(stuff: Stuff, mind: Mind, new_state: State) -> None:
+    sn_0, hash_0 = previous(mind)
+    hash = stuff.calc_update_hash(hash_0, new_state)
+    rcd = Record(sn_0+1, stuff=stuff.id, before=stuff.state, hash=hash)
+    ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
+                             {"id": stuff.id, "state": new_state}),
+                            (insert("log", rcd), rcd._asdict())]
+    mind.tx(ops)
+
+
 def do_state_change(mind: Mind, args: list[str],
                     state: State) -> list[str]:
     id = parse_item(args)
     stuff = QueryStuff(limit=1, offset=id-1).execute(mind)
     if len(stuff) == 1:
-        stuff[0].update_state(mind, state)
+        update_state(stuff[0], mind, state)
         return [f"{state.name.capitalize()}: {stuff[0]}"]
     elif len(stuff) == 0:
         return([f"Unable to find stuff: [{id}]"])

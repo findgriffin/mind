@@ -19,9 +19,14 @@ class TestSQLite(unittest.TestCase):
             self.assertFalse(sesh.con.isolation_level)
             self.assertFalse(sesh.con.in_transaction)
             cur1 = sesh.con.execute("SELECT * FROM stuff")
-            self.assertEqual(cur1.lastrowid, 0)
+            self.assertEqual(cur1.lastrowid, 1)
             cur2 = sesh.con.execute("SELECT * FROM tags")
-            self.assertEqual(cur2.lastrowid, 0)
+            self.assertEqual(cur2.lastrowid, 1)
+
+    def test_verify_empty(self):
+        with mind.Mind(self.MEM) as sesh:
+            mind.add_content(sesh, ["hello"])
+            sesh.verify()
 
     def test_add_and_query(self):
         # Given
@@ -60,7 +65,7 @@ class TestSQLite(unittest.TestCase):
                 self.assertEqual(1, len(active_after))
                 self.assertNotIn("more", active_after[0][1])
         except:
-            print(sesh.execute("SELECT * FROM stuff").fetchall())
+            print(sesh.query("SELECT * FROM stuff", ()).fetchall())
 
     def test_add_with_tags(self):
         with mind.Mind(self.MEM) as sesh:
@@ -189,6 +194,3 @@ class TestSQLite(unittest.TestCase):
             self.assertEqual(len(tag_0_set), 10)
             self.assertEqual(len(tag_1_set), 10)
             self.assertEqual(len(union), 28)
-
-    def test_run(self):
-        mind.run(Namespace(db=self.MEM, cmd=None))

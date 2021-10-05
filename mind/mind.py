@@ -65,6 +65,16 @@ class Record(NamedTuple):
     def next(self):
         return Sequence(self.sn + 1)
 
+    def parent(self):
+        return Sequence(self.sn - 1)
+
+
+def record_or_default(row) -> Record:
+    if row:
+        return Record(*row)
+    else:
+        return Record(Sequence(0), "", 0, State.ABSENT)
+
 
 class Tag(NamedTuple):
     id: int
@@ -152,8 +162,10 @@ class Mind():
                             raise RuntimeError(msg)
                 else:
                     con.execute(create_cmd)
-        con.execute("PRAGMA foreign_keys = ON")
-        self.con = con
+            con.execute("PRAGMA foreign_keys = ON")
+            self.con = con
+            if not exists:
+                add_content(self, [""], state=State.HIDDEN)
 
     def __enter__(self):
         return self
@@ -171,13 +183,32 @@ class Mind():
             logging.debug("Entered transaction.")
             [self.query(*op) for op in operations]
 
+    def get_record(self, sn):
+        cmd = "SELECT * FROM log WHERE sn = ?"
+        return record_or_default(self.query(cmd, (sn,)).fetchone())
+
     def head(self) -> Record:
-        cmd = "SELECT sn, hash, stuff, before FROM log ORDER BY sn DESC " \
-              "LIMIT 1"
-        previous = self.query(cmd, ()).fetchone()
-        if previous:
-            return Record(*previous)
-        return Record(Sequence(1), "", 0, State.ABSENT)
+        cmd = "SELECT * FROM log ORDER BY sn DESC LIMIT 1"
+        return record_or_default(self.query(cmd, ()).fetchone())
+
+    def verify(self) -> None:
+        head = self.head()
+        logging.debug(f"Verifying {head}")
+        if head.stuff:
+            cur = self.query("SELECT * FROM stuff WHERE id=?", (head.stuff, ))
+            stuff = Stuff(*cur.fetchone())
+        else:
+            stuff = Stuff(0, "", state=State.ABSENT)
+        logging.debug(f"Stuff for Record({head.sn}): {stuff}")
+        tags = QueryTags(id=stuff.id).execute(self)
+        logging.debug(f"Tags for Record({head.sn}): {tags}")
+        parent = self.get_record(head.parent())
+        logging.debug(f"Parent for Record({head.sn}: {parent}")
+        calc_hash = stuff.calc_create_hash(parent.hash, [t.tag for t in tags])
+        if calc_hash == head.hash:
+            logging.debug(f"Verified: {head}")
+        else:
+            raise Exception(f"Hash mismatch {head}, calculated: {calc_hash}")
 
 
 def parse_item(args: list[str]) -> int:
@@ -261,7 +292,8 @@ def extract_tags(raw_line: str):
     return SPACE.join(content), tags
 
 
-def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, list[str]]:
+def new_stuff(hunks: list[str], state: State,
+              joiner=NEWLINE) -> tuple[Stuff, list[str]]:
     id = int(datetime.utcnow().timestamp() * 1e6)
     cleaned: list[str] = []
     all_tags: set[str] = set()
@@ -270,7 +302,7 @@ def new_stuff(hunks: list[str], joiner=NEWLINE) -> tuple[Stuff, list[str]]:
         all_tags = all_tags.union(tags)
         cleaned.append(body)
 
-    return Stuff(id, joiner.join(cleaned), State.ACTIVE), sorted(all_tags)
+    return Stuff(id, joiner.join(cleaned), state), sorted(all_tags)
 
 
 # Always returns lowercase
@@ -364,8 +396,9 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
     return ["Not implemented yet."]
 
 
-def add_content(mind: Mind, content: list[str]) -> list[str]:
-    stuff, tags = new_stuff(content)
+def add_content(mind: Mind, content: list[str],
+                state: State = State.ACTIVE) -> list[str]:
+    stuff, tags = new_stuff(content, state)
     head = mind.head()
     hash = stuff.calc_create_hash(head.hash, tags)
     logging.debug(f"Found previous: {head.sn} {head.hash}")
@@ -434,6 +467,7 @@ COMMANDS = {
 def run(args: argparse.Namespace) -> list[str]:
     logging.debug(f"Running with arguments: {args}")
     with Mind(args.db) as mind:
+        mind.verify()
         if args.cmd in COMMANDS:
             return COMMANDS[args.cmd].do(mind, args)
         else:

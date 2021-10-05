@@ -5,6 +5,14 @@ from mind import mind
 
 class TestTagging(unittest.TestCase):
 
+    def test_tag_set(self):
+        # Given
+        tags = [mind.Tag(1, "one"), mind.Tag(1, "two")]
+        # When
+        output = mind.canonical_tags(tags)
+        # Then
+        self.assertEqual("Tags [one, two]", output)
+
     def test_extract_no_tags(self):
         # Given
         raw = "one two three"

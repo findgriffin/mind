@@ -68,6 +68,9 @@ class Record(NamedTuple):
     def parent(self):
         return Sequence(self.sn - 1)
 
+    def canonical(self):
+        return f"Record [{self.sn},{self.hash}]"
+
 
 def record_or_default(row) -> Record:
     if row:
@@ -116,21 +119,10 @@ class Stuff(NamedTuple):
         return [f"Stuff [{self.created()}]", H_RULE, canonical_tags(tags),
                 H_RULE, self.body]
 
-    def calc_create_hash(self, parent: Record, tags: list[Tag]):
-        sha = hashlib.sha1()
-        canonical = "[{}][{},{}][{}]".format(
-            parent.hash, self.full_id(), self.body, canonical_tags(tags))
-        logging.debug(f"Canonical: {canonical}")
-        sha.update(canonical.encode(UTF8))
-        return sha.hexdigest()
-
-    def calc_update_hash(self, parent: Record, new_state: State):
-        sha = hashlib.sha1()
-        canonical = f"[{parent.hash}][{self.full_id()},{self.state}-" \
-                    f">{new_state}"
-        logging.debug(f"Canonical: {canonical}")
-        sha.update(canonical.encode(UTF8))
-        return sha.hexdigest()
+    def canonical(self):
+        body = self.body if self.state == State.ACTIVE else ""
+        state = State(self.state).name
+        return f"Stuff [{self.full_id()},{state},{body}]"
 
     def __str__(self):
         return f"{self.created()} -> {self.preview()}"
@@ -142,6 +134,28 @@ class Stuff(NamedTuple):
         sha = hashlib.sha1()
         sha.update(self.__repr__())
         return sha.hexdigest()
+
+
+class Change(NamedTuple):
+    parent: Record
+    stuff: Stuff
+    before: State
+    tags: list[Tag]
+
+    def canonical(self) -> str:
+        before = State(self.before).name
+        parts = [self.parent.canonical(), self.stuff.canonical(),
+                 f"Before [{before}]", canonical_tags(self.tags)]
+        return "Change [{}]".format(",".join(parts))
+
+    def hash(self) -> str:
+        sha = hashlib.sha1()
+        sha.update(self.canonical().encode(UTF8))
+        return sha.hexdigest()
+
+    def record(self) -> Record:
+        return Record(self.parent.next(), self.hash(),
+                      self.stuff.id, self.before)
 
 
 class Mind():
@@ -195,18 +209,18 @@ class Mind():
 
     def verify(self) -> None:
         head = self.head()
-        logging.debug(f"Verifying {head}")
-        if head.stuff:
-            cur = self.query("SELECT * FROM stuff WHERE id=?", (head.stuff, ))
-            stuff = Stuff(*cur.fetchone())
+        cur = self.query("SELECT * FROM stuff WHERE id=?", (head.stuff, ))
+        stuff = Stuff(*cur.fetchone())
+        logging.debug(f"Verifying {head}, {stuff}")
+        if head.before == State.ABSENT and stuff.state == State.ACTIVE:
+            tags = QueryTags(id=stuff.id).execute(self)
         else:
-            stuff = Stuff(0, "", state=State.ABSENT)
-        logging.debug(f"Stuff for Record({head.sn}): {stuff}")
-        tags = QueryTags(id=stuff.id).execute(self)
+            tags = []
         logging.debug(f"Tags for Record({head.sn}): {tags}")
         parent = self.get_record(head.parent())
-        logging.debug(f"Parent for Record({head.sn}: {parent}")
-        calc_hash = stuff.calc_create_hash(parent, tags)
+        change = Change(parent, stuff, head.before, tags)
+        calc_hash = change.hash()
+        logging.debug(f"Computed {calc_hash} for: {change.canonical()}")
         if calc_hash == head.hash:
             logging.debug(f"Verified: {head}")
         else:
@@ -353,12 +367,13 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
     return output + [H_RULE] + wrapped + [H_RULE]
 
 
-def update_state(stuff: Stuff, mind: Mind, new_state: State) -> None:
-    head = mind.head()
-    hash = stuff.calc_update_hash(head, new_state)
-    rcd = Record(head.next(), stuff=stuff.id, before=stuff.state, hash=hash)
+def update_state(old_stuff: Stuff, mind: Mind, new_state: State) -> None:
+    new_stuff = Stuff(old_stuff.id, old_stuff.body, new_state)
+    change = Change(mind.head(), new_stuff, old_stuff.state, [])
+    logging.debug(f"Canonical update: {change.canonical()}")
+    rcd = change.record()
     ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
-                             {"id": stuff.id, "state": new_state}),
+                             {"id": old_stuff.id, "state": new_state}),
                             (insert("log", rcd), rcd._asdict())]
     mind.tx(ops)
 
@@ -401,13 +416,13 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
 def add_content(mind: Mind, content: list[str],
                 state: State = State.ACTIVE) -> list[str]:
     stuff, tags = new_stuff(content, state)
-    head = mind.head()
-    hash = stuff.calc_create_hash(head, tags)
-    logging.debug(f"Found previous: {head.sn} {head.hash}")
-    logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")
+    logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
+    change = Change(mind.head(), stuff, state, tags)
+    logging.debug(f"Canonical change: {change.canonical()}")
+    record = change.record()
+    logging.debug(f"New record: {record}")
     ops: list[Operation] = [(insert(TAGS, t), t._asdict()) for t in tags]
     ops.insert(0, (insert(STUFF, stuff), stuff._asdict()))
-    record = Record(head.next(), hash, stuff.id, State.ABSENT)
     ops.append((insert("log", record), record._asdict()))
     mind.tx(ops)
     return [f"Added {stuff} {canonical_tags(tags)}"]

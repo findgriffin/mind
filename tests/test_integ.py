@@ -30,7 +30,7 @@ class TestInteg(unittest.TestCase):
         self.assertEqual(1, len(output))
         self.assertTrue(output[0].startswith("Added "))
         self.assertIn(" -> # This is how you Markdown", output[0])
-        self.assertTrue(output[0].endswith("tags[markdown, nohello]"))
+        self.assertTrue(output[0].endswith("Tags [markdown, nohello]"))
 
     def verify_old_schema_breaks(self, path):
         # When

@@ -85,6 +85,10 @@ class Tag(NamedTuple):
         return []
 
 
+def canonical_tags(tags: list[Tag]) -> str:
+    return "Tags [{}]".format(", ".join([t.tag for t in tags]))
+
+
 class Stuff(NamedTuple):
     id: int     # Epoch (in microseconds), ms was too course for tests.
     body: str
@@ -108,24 +112,22 @@ class Stuff(NamedTuple):
         return shorten(self.body.splitlines()[0], width=width,
                        placeholder=" ...") if self.body else "EMPTY"
 
-    def show(self, tags=[]) -> list[str]:
-        tag_names = [tag.tag for tag in tags]
-        tag_names.sort()
-        return [f"Stuff [{self.created()}]", H_RULE,
-                "Tags: " + ", ".join(tag_names), H_RULE, self.body]
+    def show(self, tags: list[Tag] = []) -> list[str]:
+        return [f"Stuff [{self.created()}]", H_RULE, canonical_tags(tags),
+                H_RULE, self.body]
 
-    def calc_create_hash(self, base, tags: list[str]):
+    def calc_create_hash(self, parent: Record, tags: list[Tag]):
         sha = hashlib.sha1()
-        tags.sort()
         canonical = "[{}][{},{}][{}]".format(
-            base, self.full_id(), self.body, ",".join(tags))
+            parent.hash, self.full_id(), self.body, canonical_tags(tags))
         logging.debug(f"Canonical: {canonical}")
         sha.update(canonical.encode(UTF8))
         return sha.hexdigest()
 
-    def calc_update_hash(self, base, new_state: State):
+    def calc_update_hash(self, parent: Record, new_state: State):
         sha = hashlib.sha1()
-        canonical = f"[{base}][{self.full_id()},{self.state}->{new_state}"
+        canonical = f"[{parent.hash}][{self.full_id()},{self.state}-" \
+                    f">{new_state}"
         logging.debug(f"Canonical: {canonical}")
         sha.update(canonical.encode(UTF8))
         return sha.hexdigest()
@@ -204,7 +206,7 @@ class Mind():
         logging.debug(f"Tags for Record({head.sn}): {tags}")
         parent = self.get_record(head.parent())
         logging.debug(f"Parent for Record({head.sn}: {parent}")
-        calc_hash = stuff.calc_create_hash(parent.hash, [t.tag for t in tags])
+        calc_hash = stuff.calc_create_hash(parent, tags)
         if calc_hash == head.hash:
             logging.debug(f"Verified: {head}")
         else:
@@ -255,7 +257,7 @@ class QueryTags(NamedTuple):
 
     def cmd(self):
         if self.id:
-            return "SELECT id, tag FROM tags WHERE id=:id ORDER BY tag ASC"
+            return "SELECT * FROM tags WHERE id=:id ORDER BY tag ASC"
         else:
             return SPACE.join(["SELECT MAX(id), tag FROM tags GROUP BY tag",
                                "ORDER BY id DESC LIMIT :limit"])
@@ -293,7 +295,7 @@ def extract_tags(raw_line: str):
 
 
 def new_stuff(hunks: list[str], state: State,
-              joiner=NEWLINE) -> tuple[Stuff, list[str]]:
+              joiner=NEWLINE) -> tuple[Stuff, list[Tag]]:
     id = int(datetime.utcnow().timestamp() * 1e6)
     cleaned: list[str] = []
     all_tags: set[str] = set()
@@ -301,8 +303,8 @@ def new_stuff(hunks: list[str], state: State,
         body, tags = extract_tags(hunk)
         all_tags = all_tags.union(tags)
         cleaned.append(body)
-
-    return Stuff(id, joiner.join(cleaned), state), sorted(all_tags)
+    tag_set = [Tag(id, name) for name in sorted(all_tags)]
+    return Stuff(id, joiner.join(cleaned), state), tag_set
 
 
 # Always returns lowercase
@@ -353,7 +355,7 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
 
 def update_state(stuff: Stuff, mind: Mind, new_state: State) -> None:
     head = mind.head()
-    hash = stuff.calc_update_hash(head.hash, new_state)
+    hash = stuff.calc_update_hash(head, new_state)
     rcd = Record(head.next(), stuff=stuff.id, before=stuff.state, hash=hash)
     ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
                              {"id": stuff.id, "state": new_state}),
@@ -400,17 +402,15 @@ def add_content(mind: Mind, content: list[str],
                 state: State = State.ACTIVE) -> list[str]:
     stuff, tags = new_stuff(content, state)
     head = mind.head()
-    hash = stuff.calc_create_hash(head.hash, tags)
+    hash = stuff.calc_create_hash(head, tags)
     logging.debug(f"Found previous: {head.sn} {head.hash}")
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}, hash:{hash}")
-    ops: list[Operation] = [(insert(STUFF, stuff), stuff._asdict())]
-    for tag_name in tags:
-        tag = Tag(id=stuff.id, tag=tag_name)
-        ops.append((insert(TAGS, tag), tag._asdict()))
+    ops: list[Operation] = [(insert(TAGS, t), t._asdict()) for t in tags]
+    ops.insert(0, (insert(STUFF, stuff), stuff._asdict()))
     record = Record(head.next(), hash, stuff.id, State.ABSENT)
     ops.append((insert("log", record), record._asdict()))
     mind.tx(ops)
-    return [f"Added {stuff} tags[{', '.join(tags)}]"]
+    return [f"Added {stuff} {canonical_tags(tags)}"]
 
 
 def do_add(mind: Mind, args: argparse.Namespace) -> list[str]:

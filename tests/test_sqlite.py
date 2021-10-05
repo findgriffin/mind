@@ -2,7 +2,6 @@ import random
 import string
 from argparse import Namespace
 from datetime import datetime
-from pathlib import Path
 from time import sleep
 import unittest
 
@@ -34,6 +33,7 @@ class TestSQLite(unittest.TestCase):
             mind.add_content(sesh, ["one"])
             fetched = mind.QueryStuff().execute(sesh)
             # Then
+            sesh.verify()
             self.assertEqual(fetched[0][1], "one")
             now = datetime.utcnow().timestamp()
             # Note: from https://docs.python.org/3/library/datetime.html
@@ -49,6 +49,7 @@ class TestSQLite(unittest.TestCase):
                 sleep(0.03)
                 mind.add_content(sesh, [f"entry {i}"])
             # Then
+            sesh.verify()
             fetched = mind.QueryStuff().execute(sesh)
             self.assertEqual(10, len(fetched))
             self.assertGreater(fetched[0][0], fetched[-1][0])
@@ -115,6 +116,7 @@ class TestSQLite(unittest.TestCase):
             # When
             output = mind.do_forget(sesh, args)
             # Then
+            sesh.verify()
             self.assertEqual(1, len(output))
             self.assertTrue(output[0].startswith("Hidden: "))
             self.assertTrue(output[0].endswith(" -> some content"))
@@ -163,7 +165,7 @@ class TestSQLite(unittest.TestCase):
             # Then
             self.assertEqual(len(output), 5)
             self.assertTrue("Stuff" in output[0])
-            self.assertEqual(output[2], "Tags: something")
+            self.assertEqual(output[2], "Tags [something]")
             self.assertEqual(output[4], "hello")
 
     def test_filtered_list(self):

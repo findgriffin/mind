@@ -34,6 +34,16 @@ sqlite3.register_converter("PHASE", lambda b: Phase(int(b)))
 Sequence = NewType('Sequence', int)
 Params = Union[dict, tuple]
 Operation = tuple[str, Params]
+Transition = tuple[Phase, Phase]
+
+TRANSITIONS: dict[Transition, str] = {
+    (Phase.ABSENT, Phase.ACTIVE): "add",
+    (Phase.ACTIVE, Phase.HIDDEN): "forget",
+    (Phase.ACTIVE, Phase.DONE): "tick",
+    (Phase.HIDDEN, Phase.ACTIVE): "undo forget",
+    (Phase.DONE, Phase.ACTIVE): "undo tick",
+    (Phase.ABSENT, Phase.HIDDEN): "INIT"
+}
 
 
 class Epoch(int):
@@ -448,15 +458,24 @@ def do_show(mind: Mind, args: argparse.Namespace) -> list[str]:
         return [f"Stuff [{id}] not found."]
 
 
+def hist_row(i: int, row: tuple[int, str, Epoch, Epoch, Phase, Phase, str,
+                                Optional[str]]) -> str:
+    stuff = Stuff(id=row[2], body=row[6], state=row[5])
+    tags = "Tags [{}]".format(row[7] if row[7] else " ")
+    command = TRANSITIONS[(row[4], row[5])]
+    return f"{i}. {command:>7} {row[3]} -> {stuff.preview()} {tags}"
+
+
 def do_history(mind: Mind, args: argparse.Namespace) -> list[str]:
     cmd = SPACE.join(
-        ["SELECT log.sn, stuff.id, stuff.body, group_concat(tags.tag)",
-         "FROM log",
+        ["SELECT log.*, stuff.body, "
+         "group_concat(tags.tag)", "FROM log",
          "INNER JOIN stuff ON log.stuff = stuff.id",
          "LEFT JOIN tags ON stuff.id = tags.id",
          "GROUP BY log.sn",
-         "ORDER BY log.sn DESC LIMIT 10"])
-    return [str(row) for row in mind.query(cmd, ()).fetchall()]
+         "ORDER BY log.sn DESC LIMIT 9"])
+    cur = mind.query(cmd, ())
+    return [hist_row(i, r) for i, r in enumerate(cur.fetchall(), 1)]
 
 
 def add_content(mind: Mind, content: list[str],

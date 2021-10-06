@@ -245,19 +245,19 @@ class Mind():
         cur = self.query("SELECT * FROM stuff WHERE id=?", (record.stuff, ))
         stuff = Stuff(*cur.fetchone())
         logging.debug(f"Verifying {record}, {stuff}")
-        if record.old_state == Phase.ABSENT and stuff.state == Phase.ACTIVE:
+        if record.new_state == Phase.ACTIVE:
             tags = QueryTags(id=stuff.id).execute(self)
         else:
             tags = []
         parent = self.get_record(record.parent())
         change = Change(parent, stuff, record.act(), record.stamp, tags)
         calc_hash = change.hash()
-        logging.debug(f"Computed {calc_hash} for: {change.canonical()}")
+        computed = f"Computed: {calc_hash} <- {change.canonical()}"
+        logging.debug(computed)
         if calc_hash == record.hash:
             logging.debug(f"Verified: {record}")
         else:
-            raise Exception(f"Hash mismatch {record}, {change.canonical()} "
-                            f", calculated: {calc_hash}")
+            raise Exception(f"Hash mismatch\nRetrieved: {record}\n{computed}")
         return parent
 
     def verify(self) -> None:

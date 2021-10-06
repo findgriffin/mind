@@ -59,6 +59,14 @@ class Record(NamedTuple):
     stuff: int
     prior_state: Phase
 
+    def __str__(self):
+        parts = [str(self.sn), self.hash, hex(self.stuff)[2:],
+                 self.prior_state.name]
+        return "Record [{}]".format(",".join(parts))
+
+    def __bool__(self):
+        return self.sn > 0
+
     @classmethod
     def constraints(self) -> list[str]:
         return []
@@ -207,24 +215,29 @@ class Mind():
         cmd = "SELECT * FROM log ORDER BY sn DESC LIMIT 1"
         return record_or_default(self.query(cmd, ()).fetchone())
 
-    def verify(self) -> None:
-        head = self.head()
-        cur = self.query("SELECT * FROM stuff WHERE id=?", (head.stuff, ))
+    def _verify(self, record: Record) -> Record:
+        cur = self.query("SELECT * FROM stuff WHERE id=?", (record.stuff, ))
         stuff = Stuff(*cur.fetchone())
-        logging.debug(f"Verifying {head}, {stuff}")
-        if head.prior_state == Phase.ABSENT and stuff.state == Phase.ACTIVE:
+        logging.debug(f"Verifying {record}, {stuff}")
+        if record.prior_state == Phase.ABSENT and stuff.state == Phase.ACTIVE:
             tags = QueryTags(id=stuff.id).execute(self)
         else:
             tags = []
-        logging.debug(f"Tags for Record({head.sn}): {tags}")
-        parent = self.get_record(head.parent())
-        change = Change(parent, stuff, head.prior_state, tags)
+        parent = self.get_record(record.parent())
+        change = Change(parent, stuff, record.prior_state, tags)
         calc_hash = change.hash()
         logging.debug(f"Computed {calc_hash} for: {change.canonical()}")
-        if calc_hash == head.hash:
-            logging.debug(f"Verified: {head}")
+        if calc_hash == record.hash:
+            logging.debug(f"Verified: {record}")
         else:
-            raise Exception(f"Hash mismatch {head}, calculated: {calc_hash}")
+            raise Exception(f"Hash mismatch {record}, {change.canonical()} "
+                            f", calculated: {calc_hash}")
+        return parent
+
+    def verify(self) -> None:
+        parent = self.head()
+        while parent:
+            parent = self._verify(parent)
 
 
 def parse_item(args: list[str]) -> int:
@@ -417,7 +430,7 @@ def add_content(mind: Mind, content: list[str],
                 state: Phase = Phase.ACTIVE) -> list[str]:
     stuff, tags = new_stuff(content, state)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
-    change = Change(mind.head(), stuff, state, tags)
+    change = Change(mind.head(), stuff, Phase.ABSENT, tags)
     logging.debug(f"Canonical change: {change.canonical()}")
     record = change.record()
     logging.debug(f"New record: {record}")

@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from enum import IntEnum
 from pathlib import Path
-from sqlite3 import Connection, Cursor
+from sqlite3 import Cursor
 from textwrap import wrap, shorten
 from typing import NamedTuple, Callable, Optional, NewType, Union
 import argparse
@@ -448,8 +448,15 @@ def do_show(mind: Mind, args: argparse.Namespace) -> list[str]:
         return [f"Stuff [{id}] not found."]
 
 
-def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
-    return ["Not implemented yet."]
+def do_history(mind: Mind, args: argparse.Namespace) -> list[str]:
+    cmd = SPACE.join(
+        ["SELECT log.sn, stuff.id, stuff.body, group_concat(tags.tag)",
+         "FROM log",
+         "INNER JOIN stuff ON log.stuff = stuff.id",
+         "LEFT JOIN tags ON stuff.id = tags.id",
+         "GROUP BY log.sn",
+         "ORDER BY log.sn DESC LIMIT 10"])
+    return [str(row) for row in mind.query(cmd, ()).fetchall()]
 
 
 def add_content(mind: Mind, content: list[str],

@@ -1,7 +1,7 @@
 ### Added by Davo ###
 .idea
 **/*.iml
-*.db
+/*.db
 
 ### GitHub default Python .gitignore ###
 # Byte-compiled / optimized / DLL files

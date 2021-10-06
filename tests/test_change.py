@@ -8,6 +8,7 @@ E2 = Epoch(2)
 PARENT = Record(Sequence(30), "hash", 23, E1, Phase.ABSENT, Phase.ACTIVE)
 PHASES = (Phase.ABSENT, Phase.ACTIVE)
 
+
 class TestChange(unittest.TestCase):
 
     def test_first_entry(self):
@@ -37,9 +38,9 @@ class TestChange(unittest.TestCase):
         # When
         change = Change(PARENT, stuff, PHASES, E2, tags)
         # Then
-        self.assertEqual(change.canonical(),
-                         "Change [Record [30,hash],Stuff [f,some "\
-                         "body],Phases [ABSENT->ACTIVE],Tags [1, 2]]")
+        expected = "Change [Record [30,hash],Stuff [f,some body],Phases "\
+                   "[ABSENT->ACTIVE],Tags [1, 2]]"
+        self.assertEqual(change.canonical(), expected)
 
     def test_tick(self):
         # Given

@@ -1,8 +1,8 @@
-import datetime
 from datetime import datetime
 import unittest
 
 from mind.mind import Epoch
+
 
 class TestEpoch(unittest.TestCase):
 

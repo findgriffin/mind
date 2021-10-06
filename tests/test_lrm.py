@@ -6,8 +6,8 @@ from mind import mind
 INSERT_FOO = "INSERT INTO foo (sn, hash, stuff, stamp, old_state, new_state)" \
              " VALUES (:sn, :hash, :stuff, :stamp, :old_state, :new_state)"
 
-class TestLRM(unittest.TestCase):
 
+class TestLRM(unittest.TestCase):
 
     def test_insert(self):
         rcd = mind.Record(0, "", 0, mind.Epoch.now(), mind.Phase.ABSENT,

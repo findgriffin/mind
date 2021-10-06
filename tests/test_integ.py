@@ -48,6 +48,6 @@ class TestInteg(unittest.TestCase):
         # Given
         path = Path("tests/data/schema-v7.db")
         # When
-        with mind.Mind(path, strict=True) as sesh:
+        with mind.Mind(path, strict=True):
             pass
         # Then verify on exit

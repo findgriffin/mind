@@ -14,7 +14,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_get_db_inmem(self):
         # Given / When
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             # Then
             self.assertFalse(sesh.con.isolation_level)
             self.assertFalse(sesh.con.in_transaction)
@@ -25,16 +25,15 @@ class TestSQLite(unittest.TestCase):
 
     def test_verify_empty(self):
         logging.basicConfig(level=logging.DEBUG)
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             sesh.verify()
 
     def test_add_and_query(self):
         # Given
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             mind.add_content(sesh, ["one"])
             fetched = mind.QueryStuff().execute(sesh)
             # Then
-            sesh.verify()
             self.assertEqual(fetched[0][1], "one")
             now = datetime.utcnow().timestamp()
             # Note: from https://docs.python.org/3/library/datetime.html
@@ -45,31 +44,27 @@ class TestSQLite(unittest.TestCase):
             self.assertGreater(now * 1e6, fetched[0].id)
 
     def test_add_many_and_query(self):
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             for i in range(20):
                 sleep(0.03)
                 mind.add_content(sesh, [f"entry {i}"])
             # Then
-            sesh.verify()
             fetched = mind.QueryStuff().execute(sesh)
             self.assertEqual(10, len(fetched))
             self.assertGreater(fetched[0][0], fetched[-1][0])
 
     def test_update_correct_entry(self):
-        try:
-            with mind.Mind(self.MEM) as sesh:
-                mind.add_content(sesh, ["some stuff!!"])
-                mind.add_content(sesh, ["some more stuff!!"])
-                active_before = mind.QueryStuff().execute(sesh)
-                self.assertEqual(2, len(active_before))
-                ticked = mind.do_state_change(sesh, ["1"], mind.Phase.DONE)
-                active_after = mind.QueryStuff().execute(sesh)
-                self.assertEqual(1, len(active_after))
-                self.assertNotIn("more", active_after[0][1])
-        except:
-            print(sesh.query("SELECT * FROM stuff", ()).fetchall())
+        with mind.Mind(self.MEM, strict=True) as sesh:
+            mind.add_content(sesh, ["some stuff!!"])
+            mind.add_content(sesh, ["some more stuff!!"])
+            active_before = mind.QueryStuff().execute(sesh)
+            self.assertEqual(2, len(active_before))
+            ticked = mind.do_state_change(sesh, ["1"], mind.Phase.DONE)
+            active_after = mind.QueryStuff().execute(sesh)
+            self.assertEqual(1, len(active_after))
+            self.assertNotIn("more", active_after[0][1])
 
-    def test_add_with_tags(self):
+    def test_add_with_tags(self, strict=True):
         with mind.Mind(self.MEM) as sesh:
             mind.add_content(sesh, ["some stuff!!! #stuff"])
             sleep(.02)
@@ -87,7 +82,7 @@ class TestSQLite(unittest.TestCase):
         inserted_tags = 20
         expected_tags = 15
         inserted_rows = 40
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             for i in range(inserted_rows):
                 letters = random.choices(string.ascii_letters, k=11)
                 mind.add_content(sesh, [f"{letters} #{i % inserted_tags}"])
@@ -101,23 +96,20 @@ class TestSQLite(unittest.TestCase):
 
     def test_do_list_empty(self):
         # Given
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             # When
             output = mind.do_list(sesh, Namespace(cmd=None, num=1000))
             # Then
             self.assertEqual("  Hmm, couldn't find anything here.", output[2])
 
-
-
     def test_forget_success(self):
         # Given
         args = Namespace(forget=["1"])
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             mind.add_content(sesh, ["some content"])
             # When
             output = mind.do_forget(sesh, args)
             # Then
-            sesh.verify()
             self.assertEqual(1, len(output))
             self.assertTrue(output[0].startswith("Hidden: "))
             self.assertTrue(output[0].endswith(" -> some content"))
@@ -125,7 +117,7 @@ class TestSQLite(unittest.TestCase):
     def test_forget_when_empty(self):
         # Given
         args = Namespace(forget=["1"])
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             # When
             output = mind.do_forget(sesh, args)
             # Then
@@ -134,7 +126,7 @@ class TestSQLite(unittest.TestCase):
     def test_forget_tag_indexed(self):
         # Given
         args = Namespace(forget=["#tag.1"])
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             # When
             with self.assertRaises(NotImplementedError):
                 mind.do_forget(sesh, args)
@@ -142,7 +134,7 @@ class TestSQLite(unittest.TestCase):
     def test_tick_multiple_args(self):
         # Given
         args = Namespace(tick=["#tag.1", "wot"])
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             # When
             with self.assertRaises(NotImplementedError):
                 mind.do_tick(sesh, args)
@@ -150,7 +142,7 @@ class TestSQLite(unittest.TestCase):
     def test_tick_empty_db(self):
         # Given
         args = Namespace(tick=["1"])
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             # When
             output = mind.do_tick(sesh, args)
             # Then
@@ -159,7 +151,7 @@ class TestSQLite(unittest.TestCase):
     def test_show_success(self):
         # Given
         args = Namespace(show=["1"])
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             mind.do_add(sesh, Namespace(text="hello #something"))
             # When
             output = mind.do_show(sesh, args)
@@ -173,7 +165,7 @@ class TestSQLite(unittest.TestCase):
         # Given
         sep = ":::"
         original_entries = 30
-        with mind.Mind(self.MEM) as sesh:
+        with mind.Mind(self.MEM, strict=True) as sesh:
             for i in range(original_entries):
                 mind.do_add(sesh, Namespace(text=f"Entry{sep}{i+1} #{i % 2}"))
             excluded = []

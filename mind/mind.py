@@ -192,6 +192,7 @@ class Mind():
     tables: dict[str, type] = {STUFF: Stuff, TAGS: Tag, "log": Record}
 
     def __init__(self, filename: str, strict: bool = False) -> None:
+        self.strict = strict
         path = Path(filename).expanduser()
         exists = path.exists()
         logging.debug(f"Opening DB {path}, exists: {path.exists()}")
@@ -218,6 +219,8 @@ class Mind():
         return self
 
     def __exit__(self, *exc_details):
+        if self.strict:
+            self.verify()
         self.con.close()
 
     def query(self, sql: str, params: Params) -> Cursor:

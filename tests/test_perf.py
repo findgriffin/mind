@@ -19,7 +19,7 @@ class TestPerf(unittest.TestCase):
         # Given
         random_chars = "".join(choices(ascii_lowercase, k=11))
         db_path = Path(f"/tmp/testrun-{random_chars}.db").expanduser()
-        with mind.Mind(db_path) as sesh:
+        with mind.Mind(db_path, strict=True) as sesh:
             for i in range(1000):
                 letters = choices(ascii_letters, k=11)
                 tag = choices(digits, k=4)
@@ -42,7 +42,7 @@ class TestPerf(unittest.TestCase):
 
         # When
         start = datetime.now()
-        with mind.Mind(db_path) as sesh:
+        with mind.Mind(db_path, strict=True) as sesh:
             for i in range(200):
                 lines = [" ".join(
                     [word()] * randint(12, 16))] * randint(40, 100)

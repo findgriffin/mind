@@ -1,3 +1,4 @@
+import logging
 import random
 import string
 from argparse import Namespace
@@ -23,8 +24,8 @@ class TestSQLite(unittest.TestCase):
             self.assertEqual(cur2.lastrowid, 1)
 
     def test_verify_empty(self):
+        logging.basicConfig(level=logging.DEBUG)
         with mind.Mind(self.MEM) as sesh:
-            mind.add_content(sesh, ["hello"])
             sesh.verify()
 
     def test_add_and_query(self):

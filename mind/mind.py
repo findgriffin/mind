@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import IntEnum
 from pathlib import Path
 from sqlite3 import Connection, Cursor
@@ -33,6 +33,24 @@ sqlite3.register_converter("PHASE", lambda b: Phase(int(b)))
 Sequence = NewType('Sequence', int)
 Params = Union[dict, tuple]
 Operation = tuple[str, Params]
+MICROS = 1e6
+
+
+class Epoch(int):
+
+    def __dt__(self) -> datetime:
+        return datetime.fromtimestamp(self / MICROS, timezone.utc)
+
+    def __str__(self):
+        return self.__dt__().isoformat()[:16]
+
+    @classmethod
+    def now(cls):
+        return cls(datetime.now(tz=timezone.utc).timestamp() * MICROS)
+
+
+sqlite3.register_adapter(Epoch, lambda e: e)
+sqlite3.register_converter("EPOCH", lambda b: Epoch(int(b)))
 
 
 def insert(table: str, row):
@@ -46,6 +64,7 @@ def insert(table: str, row):
 TYPE_MAP: dict[type, Callable[[str], str]] = {
     Phase: lambda n: f"PHASE NOT NULL CHECK ({n} BETWEEN 1 AND 4)",
     Sequence: lambda n: "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL",
+    Epoch: lambda n: "EPOCH NOT NULL",
     int: lambda n: "INTEGER NOT NULL",
     float: lambda n: "REAL NOT NULL",
     str: lambda n: "TEXT NOT NULL",
@@ -57,12 +76,13 @@ class Record(NamedTuple):
     sn: Sequence
     hash: str
     stuff: int
+    stamp: Epoch
     prior_state: Phase
 
     def __str__(self):
-        parts = [str(self.sn), self.hash, hex(self.stuff)[2:],
-                 self.prior_state.name]
-        return "Record [{}]".format(",".join(parts))
+        parts = [str(self.sn), str(self.stamp),
+                 self.hash, hex(self.stuff)[2:], self.prior_state.name]
+        return "Record [{}]".format(", ".join(parts))
 
     def __bool__(self):
         return self.sn > 0
@@ -85,7 +105,7 @@ def record_or_default(row) -> Record:
     if row:
         return Record(*row)
     else:
-        return Record(Sequence(0), "", 0, Phase.ABSENT)
+        return Record(Sequence(0), "", 0, Epoch(0), Phase.ABSENT)
 
 
 class Tag(NamedTuple):
@@ -148,6 +168,7 @@ class Change(NamedTuple):
     parent: Record
     stuff: Stuff
     before: Phase
+    stamp: Epoch
     tags: list[Tag]
 
     def canonical(self) -> str:
@@ -162,7 +183,7 @@ class Change(NamedTuple):
 
     def record(self) -> Record:
         return Record(self.parent.next(), self.hash(),
-                      self.stuff.id, self.before)
+                      self.stuff.id, self.stamp, self.before)
 
 
 class Mind():
@@ -224,7 +245,7 @@ class Mind():
         else:
             tags = []
         parent = self.get_record(record.parent())
-        change = Change(parent, stuff, record.prior_state, tags)
+        change = Change(parent, stuff, record.prior_state, record.stamp, tags)
         calc_hash = change.hash()
         logging.debug(f"Computed {calc_hash} for: {change.canonical()}")
         if calc_hash == record.hash:
@@ -322,8 +343,9 @@ def extract_tags(raw_line: str):
 
 
 def new_stuff(hunks: list[str], state: Phase,
-              joiner=NEWLINE) -> tuple[Stuff, list[Tag]]:
-    id = int(datetime.utcnow().timestamp() * 1e6)
+              joiner=NEWLINE) -> tuple[Stuff, list[Tag], Epoch]:
+    now = Epoch.now()
+    id = int(now)
     cleaned: list[str] = []
     all_tags: set[str] = set()
     for hunk in hunks:
@@ -331,7 +353,7 @@ def new_stuff(hunks: list[str], state: Phase,
         all_tags = all_tags.union(tags)
         cleaned.append(body)
     tag_set = [Tag(id, name) for name in sorted(all_tags)]
-    return Stuff(id, joiner.join(cleaned), state), tag_set
+    return Stuff(id, joiner.join(cleaned), state), tag_set, now
 
 
 # Always returns lowercase
@@ -382,7 +404,7 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
 
 def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> None:
     new_stuff = Stuff(old_stuff.id, old_stuff.body, new_state)
-    change = Change(mind.head(), new_stuff, old_stuff.state, [])
+    change = Change(mind.head(), new_stuff, old_stuff.state, Epoch.now(), [])
     logging.debug(f"Canonical update: {change.canonical()}")
     rcd = change.record()
     ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
@@ -428,9 +450,9 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
 
 def add_content(mind: Mind, content: list[str],
                 state: Phase = Phase.ACTIVE) -> list[str]:
-    stuff, tags = new_stuff(content, state)
+    stuff, tags, timestamp = new_stuff(content, state)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
-    change = Change(mind.head(), stuff, Phase.ABSENT, tags)
+    change = Change(mind.head(), stuff, Phase.ABSENT, timestamp, tags)
     logging.debug(f"Canonical change: {change.canonical()}")
     record = change.record()
     logging.debug(f"New record: {record}")

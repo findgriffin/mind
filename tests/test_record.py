@@ -9,7 +9,8 @@ class TestRecord(unittest.TestCase):
         # When
         output = mind.record_or_default(None)
         # Then
-        self.assertEqual(output, mind.Record(0, "", 0, mind.Phase.ABSENT))
+        self.assertEqual(output, mind.Record(0, "", 0, output.stamp,
+                                             mind.Phase.ABSENT))
         self.assertEqual(output.parent(), -1)
         self.assertEqual(output.next(), 1)
         self.assertEqual(output.canonical(), "Record [0,]")
@@ -18,6 +19,7 @@ class TestRecord(unittest.TestCase):
         # Given
         hash = "1ab234f"
         # When
-        output = mind.Record(1, hash, 0, mind.Phase.ABSENT).canonical()
+        output = mind.Record(1, hash, 0, mind.Epoch.now(),
+                             mind.Phase.ABSENT).canonical()
         # Then
         self.assertEqual(output, f"Record [1,{hash}]")

@@ -27,7 +27,7 @@ class TestStuff(unittest.TestCase):
         # Given
         body = "This discription is longer than fourty characters."
         # When
-        stuff, tags = mind.new_stuff([body], mind.Phase.ACTIVE)
+        stuff, tags, ts = mind.new_stuff([body], mind.Phase.ACTIVE)
         output = stuff.__repr__()
         # Then
         self.assertEqual(len(output), 78)  # .strip() remove last space
@@ -38,7 +38,7 @@ class TestStuff(unittest.TestCase):
         # Given
         body = "This discription is longer than fourty characters. Really!"
         # When
-        stuff, tags = mind.new_stuff([body], mind.Phase.ACTIVE)
+        stuff, tags, ts = mind.new_stuff([body], mind.Phase.ACTIVE)
         output = f"{stuff}"
         # Then
         self.assertEqual(len(output), 55)

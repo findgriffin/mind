@@ -8,7 +8,7 @@ class TestStuff(unittest.TestCase):
     def test_canonical_active(self):
         # Given
         body = "This discription is longer than fourty characters."
-        stuff = mind.Stuff(int(1e8), body, mind.State.ACTIVE)
+        stuff = mind.Stuff(int(1e8), body, mind.Phase.ACTIVE)
         # When
         output = stuff.canonical()
         # Then
@@ -17,7 +17,7 @@ class TestStuff(unittest.TestCase):
     def test_canonical_inactive(self):
         # Given
         body = "This discription is longer than fourty characters."
-        stuff = mind.Stuff(int(1e8), body, mind.State.HIDDEN)
+        stuff = mind.Stuff(int(1e8), body, mind.Phase.HIDDEN)
         # When
         output = stuff.canonical()
         # Then
@@ -27,7 +27,7 @@ class TestStuff(unittest.TestCase):
         # Given
         body = "This discription is longer than fourty characters."
         # When
-        stuff, tags = mind.new_stuff([body], mind.State.ACTIVE)
+        stuff, tags = mind.new_stuff([body], mind.Phase.ACTIVE)
         output = stuff.__repr__()
         # Then
         self.assertEqual(len(output), 78)  # .strip() remove last space
@@ -38,7 +38,7 @@ class TestStuff(unittest.TestCase):
         # Given
         body = "This discription is longer than fourty characters. Really!"
         # When
-        stuff, tags = mind.new_stuff([body], mind.State.ACTIVE)
+        stuff, tags = mind.new_stuff([body], mind.Phase.ACTIVE)
         output = f"{stuff}"
         # Then
         self.assertEqual(len(output), 55)

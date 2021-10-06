@@ -61,7 +61,7 @@ class TestSQLite(unittest.TestCase):
                 mind.add_content(sesh, ["some more stuff!!"])
                 active_before = mind.QueryStuff().execute(sesh)
                 self.assertEqual(2, len(active_before))
-                ticked = mind.do_state_change(sesh, ["1"], mind.State.DONE)
+                ticked = mind.do_state_change(sesh, ["1"], mind.Phase.DONE)
                 active_after = mind.QueryStuff().execute(sesh)
                 self.assertEqual(1, len(active_after))
                 self.assertNotIn("more", active_after[0][1])

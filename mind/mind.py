@@ -27,8 +27,8 @@ VIEW_WIDTH = 80
 H_RULE = "-" * VIEW_WIDTH
 
 
-State = IntEnum("State", "ABSENT ACTIVE DONE HIDDEN")
-sqlite3.register_adapter(State, lambda s: s.value)
+Phase = IntEnum("Phase", "ABSENT ACTIVE DONE HIDDEN")
+sqlite3.register_adapter(Phase, lambda s: s.value)
 Sequence = NewType('Sequence', int)
 Params = Union[dict, tuple]
 Operation = tuple[str, Params]
@@ -43,7 +43,7 @@ def insert(table: str, row):
 # None / Null not included here as there are no optional columns (yet)
 # Optional[int|str] could be mapped to removing the 'NOT NULL' constraint
 TYPE_MAP: dict[type, Callable[[str], str]] = {
-    State: lambda n: f"INTEGER NOT NULL CHECK ({n} BETWEEN 1 AND 4)",
+    Phase: lambda n: f"INTEGER NOT NULL CHECK ({n} BETWEEN 1 AND 4)",
     Sequence: lambda n: "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL",
     int: lambda n: "INTEGER NOT NULL",
     float: lambda n: "REAL NOT NULL",
@@ -56,7 +56,7 @@ class Record(NamedTuple):
     sn: Sequence
     hash: str
     stuff: int
-    before: State
+    before: Phase
 
     @classmethod
     def constraints(self) -> list[str]:
@@ -76,7 +76,7 @@ def record_or_default(row) -> Record:
     if row:
         return Record(*row)
     else:
-        return Record(Sequence(0), "", 0, State.ABSENT)
+        return Record(Sequence(0), "", 0, Phase.ABSENT)
 
 
 class Tag(NamedTuple):
@@ -95,7 +95,7 @@ def canonical_tags(tags: list[Tag]) -> str:
 class Stuff(NamedTuple):
     id: int     # Epoch (in microseconds), ms was too course for tests.
     body: str
-    state: State = State.ACTIVE
+    state: Phase = Phase.ACTIVE
 
     @classmethod
     def constraints(self) -> list[str]:
@@ -120,8 +120,8 @@ class Stuff(NamedTuple):
                 H_RULE, self.body]
 
     def canonical(self):
-        body = self.body if self.state == State.ACTIVE else ""
-        state = State(self.state).name
+        body = self.body if self.state == Phase.ACTIVE else ""
+        state = Phase(self.state).name
         return f"Stuff [{self.full_id()},{state},{body}]"
 
     def __str__(self):
@@ -139,11 +139,11 @@ class Stuff(NamedTuple):
 class Change(NamedTuple):
     parent: Record
     stuff: Stuff
-    before: State
+    before: Phase
     tags: list[Tag]
 
     def canonical(self) -> str:
-        before = State(self.before).name
+        before = Phase(self.before).name
         parts = [self.parent.canonical(), self.stuff.canonical(),
                  f"Before [{before}]", canonical_tags(self.tags)]
         return "Change [{}]".format(",".join(parts))
@@ -181,7 +181,7 @@ class Mind():
             con.execute("PRAGMA foreign_keys = ON")
             self.con = con
             if not exists:
-                add_content(self, [""], state=State.HIDDEN)
+                add_content(self, [""], state=Phase.HIDDEN)
 
     def __enter__(self):
         return self
@@ -212,7 +212,7 @@ class Mind():
         cur = self.query("SELECT * FROM stuff WHERE id=?", (head.stuff, ))
         stuff = Stuff(*cur.fetchone())
         logging.debug(f"Verifying {head}, {stuff}")
-        if head.before == State.ABSENT and stuff.state == State.ACTIVE:
+        if head.before == Phase.ABSENT and stuff.state == Phase.ACTIVE:
             tags = QueryTags(id=stuff.id).execute(self)
         else:
             tags = []
@@ -240,7 +240,7 @@ class QueryStuff(NamedTuple):
     latest: bool = True
     limit: int = PAGE_SIZE + 1
     offset: int = 0
-    state: State = State.ACTIVE
+    state: Phase = Phase.ACTIVE
     tag: Optional[str] = None
 
     def order(self) -> str:
@@ -308,7 +308,7 @@ def extract_tags(raw_line: str):
     return SPACE.join(content), tags
 
 
-def new_stuff(hunks: list[str], state: State,
+def new_stuff(hunks: list[str], state: Phase,
               joiner=NEWLINE) -> tuple[Stuff, list[Tag]]:
     id = int(datetime.utcnow().timestamp() * 1e6)
     cleaned: list[str] = []
@@ -367,7 +367,7 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
     return output + [H_RULE] + wrapped + [H_RULE]
 
 
-def update_state(old_stuff: Stuff, mind: Mind, new_state: State) -> None:
+def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> None:
     new_stuff = Stuff(old_stuff.id, old_stuff.body, new_state)
     change = Change(mind.head(), new_stuff, old_stuff.state, [])
     logging.debug(f"Canonical update: {change.canonical()}")
@@ -379,7 +379,7 @@ def update_state(old_stuff: Stuff, mind: Mind, new_state: State) -> None:
 
 
 def do_state_change(mind: Mind, args: list[str],
-                    state: State) -> list[str]:
+                    state: Phase) -> list[str]:
     id = parse_item(args)
     stuff = QueryStuff(limit=1, offset=id-1).execute(mind)
     if len(stuff) == 1:
@@ -392,11 +392,11 @@ def do_state_change(mind: Mind, args: list[str],
 
 
 def do_forget(mind: Mind, args: argparse.Namespace) -> list[str]:
-    return do_state_change(mind, args.forget, State.HIDDEN)
+    return do_state_change(mind, args.forget, Phase.HIDDEN)
 
 
 def do_tick(mind: Mind, args: argparse.Namespace) -> list[str]:
-    return do_state_change(mind, args.tick, State.DONE)
+    return do_state_change(mind, args.tick, Phase.DONE)
 
 
 def do_show(mind: Mind, args: argparse.Namespace) -> list[str]:
@@ -414,7 +414,7 @@ def do_history(con: Connection, args: argparse.Namespace) -> list[str]:
 
 
 def add_content(mind: Mind, content: list[str],
-                state: State = State.ACTIVE) -> list[str]:
+                state: Phase = Phase.ACTIVE) -> list[str]:
     stuff, tags = new_stuff(content, state)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
     change = Change(mind.head(), stuff, state, tags)

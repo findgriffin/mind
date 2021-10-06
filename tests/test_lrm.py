@@ -7,7 +7,7 @@ from mind import mind
 class TestLRM(unittest.TestCase):
 
     def test_insert(self):
-        rcd = mind.Record(0, "", 0, mind.State.ABSENT)
+        rcd = mind.Record(0, "", 0, mind.Phase.ABSENT)
         stmt = mind.insert("foo", rcd)
         self.assertEqual(stmt, "INSERT INTO foo (sn, hash, stuff, before) "
                          "VALUES (:sn, :hash, :stuff, :before)")

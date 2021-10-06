@@ -13,7 +13,7 @@ class TestStuff(unittest.TestCase):
         # When
         output = stuff.canonical()
         # Then
-        self.assertEqual(output, f"Stuff [5f5e100,ACTIVE,{body}]")
+        self.assertEqual(output, f"Stuff [5f5e100,{body}]")
 
     def test_canonical_inactive(self):
         # Given
@@ -22,7 +22,7 @@ class TestStuff(unittest.TestCase):
         # When
         output = stuff.canonical()
         # Then
-        self.assertEqual(output, "Stuff [5f5e100,HIDDEN,]")
+        self.assertEqual(output, "Stuff [5f5e100,]")
 
     def test_repr(self):
         # Given

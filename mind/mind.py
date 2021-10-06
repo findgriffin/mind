@@ -105,6 +105,9 @@ class Record(NamedTuple):
     def canonical(self):
         return f"Record [{self.sn},{self.hash}]"
 
+    def act(self) -> tuple[Phase, Phase]:
+        return (self.old_state, self.new_state)
+
 
 def record_or_default(row) -> Record:
     if row:
@@ -144,9 +147,11 @@ class Stuff(NamedTuple):
         return [f"Stuff [{self.id}]", H_RULE, canonical_tags(tags),
                 H_RULE, self.body]
 
-    def canonical(self):
-        body = self.body if self.state == Phase.ACTIVE else ""
-        return f"Stuff [{self.id!r},{self.state.name},{body}]"
+    def canonical(self, phase: Phase = None):
+        if not phase:
+            phase = self.state
+        body = self.body if phase == Phase.ACTIVE else ""
+        return f"Stuff [{self.id!r},{body}]"
 
     def __str__(self):
         return f"{self.id} -> {self.preview()}"
@@ -163,13 +168,14 @@ class Stuff(NamedTuple):
 class Change(NamedTuple):
     parent: Record
     stuff: Stuff
-    before: Phase
+    act: tuple[Phase, Phase]
     stamp: Epoch
     tags: list[Tag]
 
     def canonical(self) -> str:
-        parts = [self.parent.canonical(), self.stuff.canonical(),
-                 f"Before [{self.before.name}]", canonical_tags(self.tags)]
+        phases = f"Phases [{self.act[0].name}->{self.act[1].name}]"
+        parts = [self.parent.canonical(), self.stuff.canonical(self.act[1]),
+                 phases, canonical_tags(self.tags)]
         return "Change [{}]".format(",".join(parts))
 
     def hash(self) -> str:
@@ -179,7 +185,7 @@ class Change(NamedTuple):
 
     def record(self) -> Record:
         return Record(self.parent.next(), self.hash(), self.stuff.id,
-                      self.stamp, self.before, self.stuff.state)  # TODO: state
+                      self.stamp, self.act[0], self.act[1])
 
 
 class Mind():
@@ -241,7 +247,7 @@ class Mind():
         else:
             tags = []
         parent = self.get_record(record.parent())
-        change = Change(parent, stuff, record.old_state, record.stamp, tags)
+        change = Change(parent, stuff, record.act(), record.stamp, tags)
         calc_hash = change.hash()
         logging.debug(f"Computed {calc_hash} for: {change.canonical()}")
         if calc_hash == record.hash:
@@ -398,8 +404,8 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
 
 
 def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> None:
-    new_stuff = Stuff(old_stuff.id, old_stuff.body, new_state)
-    change = Change(mind.head(), new_stuff, old_stuff.state, Epoch.now(), [])
+    phases = (old_stuff.state, new_state)
+    change = Change(mind.head(), old_stuff, phases, Epoch.now(), [])
     logging.debug(f"Canonical update: {change.canonical()}")
     rcd = change.record()
     ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
@@ -447,7 +453,8 @@ def add_content(mind: Mind, content: list[str],
                 state: Phase = Phase.ACTIVE) -> list[str]:
     stuff, tags, timestamp = new_stuff(content, state)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
-    change = Change(mind.head(), stuff, Phase.ABSENT, timestamp, tags)
+    phases = (Phase.ABSENT, state)
+    change = Change(mind.head(), stuff, phases, timestamp, tags)
     logging.debug(f"Canonical change: {change.canonical()}")
     record = change.record()
     logging.debug(f"New record: {record}")

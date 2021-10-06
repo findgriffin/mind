@@ -2,13 +2,14 @@ import unittest
 
 from mind import mind
 
+E1 = mind.Epoch(int(1e8))
 
 class TestStuff(unittest.TestCase):
 
     def test_canonical_active(self):
         # Given
         body = "This discription is longer than fourty characters."
-        stuff = mind.Stuff(int(1e8), body, mind.Phase.ACTIVE)
+        stuff = mind.Stuff(E1, body, mind.Phase.ACTIVE)
         # When
         output = stuff.canonical()
         # Then
@@ -17,7 +18,7 @@ class TestStuff(unittest.TestCase):
     def test_canonical_inactive(self):
         # Given
         body = "This discription is longer than fourty characters."
-        stuff = mind.Stuff(int(1e8), body, mind.Phase.HIDDEN)
+        stuff = mind.Stuff(E1, body, mind.Phase.HIDDEN)
         # When
         output = stuff.canonical()
         # Then

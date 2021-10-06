@@ -44,6 +44,9 @@ class Epoch(int):
     def __str__(self):
         return self.__dt__().isoformat()[:16]
 
+    def __repr__(self):
+        return hex(self)[2:]
+
     @classmethod
     def now(cls):
         return cls(datetime.now(tz=timezone.utc).timestamp() * MICROS)
@@ -75,13 +78,13 @@ TYPE_MAP: dict[type, Callable[[str], str]] = {
 class Record(NamedTuple):
     sn: Sequence
     hash: str
-    stuff: int
+    stuff: Epoch
     stamp: Epoch
     prior_state: Phase
 
     def __str__(self):
         parts = [str(self.sn), str(self.stamp),
-                 self.hash, hex(self.stuff)[2:], self.prior_state.name]
+                 self.hash, repr(self.stuff), self.prior_state.name]
         return "Record [{}]".format(", ".join(parts))
 
     def __bool__(self):
@@ -105,11 +108,11 @@ def record_or_default(row) -> Record:
     if row:
         return Record(*row)
     else:
-        return Record(Sequence(0), "", 0, Epoch(0), Phase.ABSENT)
+        return Record(Sequence(0), "", Epoch(0), Epoch(0), Phase.ABSENT)
 
 
 class Tag(NamedTuple):
-    id: int
+    id: Epoch
     tag: str
 
     @classmethod
@@ -122,7 +125,7 @@ def canonical_tags(tags: list[Tag]) -> str:
 
 
 class Stuff(NamedTuple):
-    id: int     # Epoch (in microseconds), ms was too course for tests.
+    id: Epoch     # Epoch (in microseconds), ms was too course for tests.
     body: str
     state: Phase = Phase.ACTIVE
 
@@ -130,33 +133,23 @@ class Stuff(NamedTuple):
     def constraints(self) -> list[str]:
         return ["PRIMARY KEY (id)"]
 
-    def epoch(self) -> int:
-        """Returns the unix epoch of this stuff in seconds, as an integer."""
-        return int(self.id * 1e-6)
-
-    def full_id(self):
-        return hex(self.id)[2:]
-
-    def created(self):
-        return datetime.fromtimestamp(self.epoch()).isoformat()[:16]
-
     def preview(self, width=40):
         return shorten(self.body.splitlines()[0], width=width,
                        placeholder=" ...") if self.body else "EMPTY"
 
     def show(self, tags: list[Tag] = []) -> list[str]:
-        return [f"Stuff [{self.created()}]", H_RULE, canonical_tags(tags),
+        return [f"Stuff [{self.id}]", H_RULE, canonical_tags(tags),
                 H_RULE, self.body]
 
     def canonical(self):
         body = self.body if self.state == Phase.ACTIVE else ""
-        return f"Stuff [{self.full_id()},{self.state.name},{body}]"
+        return f"Stuff [{self.id!r},{self.state.name},{body}]"
 
     def __str__(self):
-        return f"{self.created()} -> {self.preview()}"
+        return f"{self.id} -> {self.preview()}"
 
     def __repr__(self):
-        return f"Stuff[{self.full_id()},{self.state.name},{self.body}]"
+        return f"Stuff[{self.id!r},{self.state.name},{self.body}]"
 
     def hash(self):
         sha = hashlib.sha1()
@@ -345,15 +338,14 @@ def extract_tags(raw_line: str):
 def new_stuff(hunks: list[str], state: Phase,
               joiner=NEWLINE) -> tuple[Stuff, list[Tag], Epoch]:
     now = Epoch.now()
-    id = int(now)
     cleaned: list[str] = []
     all_tags: set[str] = set()
     for hunk in hunks:
         body, tags = extract_tags(hunk)
         all_tags = all_tags.union(tags)
         cleaned.append(body)
-    tag_set = [Tag(id, name) for name in sorted(all_tags)]
-    return Stuff(id, joiner.join(cleaned), state), tag_set, now
+    tag_set = [Tag(now, name) for name in sorted(all_tags)]
+    return Stuff(now, joiner.join(cleaned), state), tag_set, now
 
 
 # Always returns lowercase

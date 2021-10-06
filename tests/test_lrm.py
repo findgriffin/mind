@@ -3,17 +3,18 @@ import unittest
 
 from mind import mind
 
+INSERT_FOO = "INSERT INTO foo (sn, hash, stuff, prior_state) VALUES (:sn, "\
+             ":hash, :stuff, :prior_state)"
 
 class TestLRM(unittest.TestCase):
+
 
     def test_insert(self):
         rcd = mind.Record(0, "", 0, mind.Phase.ABSENT)
         stmt = mind.insert("foo", rcd)
-        self.assertEqual(stmt, "INSERT INTO foo (sn, hash, stuff, before) "
-                         "VALUES (:sn, :hash, :stuff, :before)")
+        self.assertEqual(stmt, INSERT_FOO)
 
     def test_insert_even_if_none(self):
         rcd = mind.Record(0, None, None, None)
         stmt = mind.insert("foo", rcd)
-        self.assertEqual(stmt, "INSERT INTO foo (sn, hash, stuff, before) "
-                               "VALUES (:sn, :hash, :stuff, :before)")
+        self.assertEqual(stmt, INSERT_FOO)

@@ -54,8 +54,11 @@ class TestInteg(unittest.TestCase):
         self.verify_old_schema_breaks(Path("tests/data/schema-v4.db"))
 
     def test_schema_v5(self):
+        self.verify_old_schema_breaks(Path("tests/data/schema-v5.db"))
+
+    def test_schema_v6(self):
         # Given
-        path = Path("tests/data/schema-v5.db")
+        path = Path("tests/data/schema-v6.db")
         # When
         with mind.Mind(path, strict=True) as sesh:
             mind.QueryStuff().execute(sesh)

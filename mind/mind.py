@@ -29,6 +29,7 @@ H_RULE = "-" * VIEW_WIDTH
 
 Phase = IntEnum("Phase", "ABSENT ACTIVE DONE HIDDEN")
 sqlite3.register_adapter(Phase, lambda s: s.value)
+sqlite3.register_converter("PHASE", lambda b: Phase(int(b)))
 Sequence = NewType('Sequence', int)
 Params = Union[dict, tuple]
 Operation = tuple[str, Params]
@@ -43,7 +44,7 @@ def insert(table: str, row):
 # None / Null not included here as there are no optional columns (yet)
 # Optional[int|str] could be mapped to removing the 'NOT NULL' constraint
 TYPE_MAP: dict[type, Callable[[str], str]] = {
-    Phase: lambda n: f"INTEGER NOT NULL CHECK ({n} BETWEEN 1 AND 4)",
+    Phase: lambda n: f"PHASE NOT NULL CHECK ({n} BETWEEN 1 AND 4)",
     Sequence: lambda n: "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL",
     int: lambda n: "INTEGER NOT NULL",
     float: lambda n: "REAL NOT NULL",
@@ -121,8 +122,7 @@ class Stuff(NamedTuple):
 
     def canonical(self):
         body = self.body if self.state == Phase.ACTIVE else ""
-        state = Phase(self.state).name
-        return f"Stuff [{self.full_id()},{state},{body}]"
+        return f"Stuff [{self.full_id()},{self.state.name},{body}]"
 
     def __str__(self):
         return f"{self.created()} -> {self.preview()}"
@@ -143,9 +143,8 @@ class Change(NamedTuple):
     tags: list[Tag]
 
     def canonical(self) -> str:
-        before = Phase(self.before).name
         parts = [self.parent.canonical(), self.stuff.canonical(),
-                 f"Before [{before}]", canonical_tags(self.tags)]
+                 f"Before [{self.before.name}]", canonical_tags(self.tags)]
         return "Change [{}]".format(",".join(parts))
 
     def hash(self) -> str:
@@ -165,7 +164,8 @@ class Mind():
         path = Path(filename).expanduser()
         exists = path.exists()
         logging.debug(f"Opening DB {path}, exists: {path.exists()}")
-        with sqlite3.connect(path) as con:
+        with sqlite3.connect(path,
+                             detect_types=sqlite3.PARSE_DECLTYPES) as con:
             for name, schema in self.tables.items():
                 create_cmd = build_create_table_cmd(name, schema)
                 if exists:

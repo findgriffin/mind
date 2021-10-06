@@ -5,6 +5,7 @@ from mind.mind import Change, record_or_default, Record, Stuff, Phase, \
 
 E1 = Epoch(1)
 E2 = Epoch(2)
+PARENT = Record(Sequence(30), "hash", 23, E1, Phase.ABSENT, Phase.ACTIVE)
 
 class TestChange(unittest.TestCase):
 
@@ -20,21 +21,19 @@ class TestChange(unittest.TestCase):
 
     def test_add(self):
         # Given
-        parent = Record(Sequence(30), "hash", 23, E1, Phase.ABSENT)
         stuff = Stuff(Epoch(15), "some body", state=Phase.ACTIVE)
         # When
-        canon = Change(parent, stuff, Phase.ABSENT, E2, []).canonical()
+        canon = Change(PARENT, stuff, Phase.ABSENT, E2, []).canonical()
         # Then
         self.assertEqual(canon, "Change [Record [30,hash],Stuff [f,ACTIVE,"
                                 "some body],Before [ABSENT],Tags []]")
 
     def test_add_with_tag(self):
         # Given
-        parent = Record(Sequence(30), "hash", 23, E1, Phase.ABSENT)
         stuff = Stuff(Epoch(15), "some body", state=Phase.ACTIVE)
         tags = [Tag(1, "1"), Tag(1, "2")]
         # When
-        change = Change(parent, stuff, Phase.ABSENT, E2, tags)
+        change = Change(PARENT, stuff, Phase.ABSENT, E2, tags)
         # Then
         self.assertEqual(change.canonical(),
                          "Change [Record [30,hash],Stuff [f,ACTIVE,some "\
@@ -42,11 +41,9 @@ class TestChange(unittest.TestCase):
 
     def test_tick(self):
         # Given
-        parent = Record(Sequence(30), "hash", 23, Epoch(10),
-                        Phase.ABSENT)
         stuff = Stuff(Epoch(15), "some body", state=Phase.DONE)
         # When
-        canon = Change(parent, stuff, Phase.ACTIVE, Epoch(11), []).canonical()
+        canon = Change(PARENT, stuff, Phase.ACTIVE, Epoch(11), []).canonical()
         # Then
         self.assertEqual(canon, "Change [Record [30,hash],Stuff [f,DONE,"
                                 "],Before [ACTIVE],Tags []]")

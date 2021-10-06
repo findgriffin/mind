@@ -15,6 +15,7 @@ import sys
 CLEAN = "clean"
 CMD = "cmd"
 DEFAULT_DB = "~/.mind.db"
+MICROS = 1e6
 NEWLINE = "\n"
 SPACE = " "
 STUFF = "stuff"
@@ -33,7 +34,6 @@ sqlite3.register_converter("PHASE", lambda b: Phase(int(b)))
 Sequence = NewType('Sequence', int)
 Params = Union[dict, tuple]
 Operation = tuple[str, Params]
-MICROS = 1e6
 
 
 class Epoch(int):
@@ -80,11 +80,13 @@ class Record(NamedTuple):
     hash: str
     stuff: Epoch
     stamp: Epoch
-    prior_state: Phase
+    old_state: Phase
+    new_state: Phase
 
     def __str__(self):
+        states = "->".join((self.old_state.name, self.new_state.name))
         parts = [str(self.sn), str(self.stamp),
-                 self.hash, repr(self.stuff), self.prior_state.name]
+                 self.hash, repr(self.stuff), states]
         return "Record [{}]".format(", ".join(parts))
 
     def __bool__(self):
@@ -108,7 +110,8 @@ def record_or_default(row) -> Record:
     if row:
         return Record(*row)
     else:
-        return Record(Sequence(0), "", Epoch(0), Epoch(0), Phase.ABSENT)
+        return Record(Sequence(0), "", Epoch(0), Epoch(0),
+                      Phase.ABSENT, Phase.HIDDEN)
 
 
 class Tag(NamedTuple):
@@ -175,8 +178,8 @@ class Change(NamedTuple):
         return sha.hexdigest()
 
     def record(self) -> Record:
-        return Record(self.parent.next(), self.hash(),
-                      self.stuff.id, self.stamp, self.before)
+        return Record(self.parent.next(), self.hash(), self.stuff.id,
+                      self.stamp, self.before, self.stuff.state)  # TODO: state
 
 
 class Mind():
@@ -233,12 +236,12 @@ class Mind():
         cur = self.query("SELECT * FROM stuff WHERE id=?", (record.stuff, ))
         stuff = Stuff(*cur.fetchone())
         logging.debug(f"Verifying {record}, {stuff}")
-        if record.prior_state == Phase.ABSENT and stuff.state == Phase.ACTIVE:
+        if record.old_state == Phase.ABSENT and stuff.state == Phase.ACTIVE:
             tags = QueryTags(id=stuff.id).execute(self)
         else:
             tags = []
         parent = self.get_record(record.parent())
-        change = Change(parent, stuff, record.prior_state, record.stamp, tags)
+        change = Change(parent, stuff, record.old_state, record.stamp, tags)
         calc_hash = change.hash()
         logging.debug(f"Computed {calc_hash} for: {change.canonical()}")
         if calc_hash == record.hash:

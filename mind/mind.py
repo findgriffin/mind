@@ -56,7 +56,7 @@ class Record(NamedTuple):
     sn: Sequence
     hash: str
     stuff: int
-    before: Phase
+    prior_state: Phase
 
     @classmethod
     def constraints(self) -> list[str]:
@@ -212,13 +212,13 @@ class Mind():
         cur = self.query("SELECT * FROM stuff WHERE id=?", (head.stuff, ))
         stuff = Stuff(*cur.fetchone())
         logging.debug(f"Verifying {head}, {stuff}")
-        if head.before == Phase.ABSENT and stuff.state == Phase.ACTIVE:
+        if head.prior_state == Phase.ABSENT and stuff.state == Phase.ACTIVE:
             tags = QueryTags(id=stuff.id).execute(self)
         else:
             tags = []
         logging.debug(f"Tags for Record({head.sn}): {tags}")
         parent = self.get_record(head.parent())
-        change = Change(parent, stuff, head.before, tags)
+        change = Change(parent, stuff, head.prior_state, tags)
         calc_hash = change.hash()
         logging.debug(f"Computed {calc_hash} for: {change.canonical()}")
         if calc_hash == head.hash:

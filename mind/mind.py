@@ -94,10 +94,8 @@ class Record(NamedTuple):
     new_state: Phase
 
     def __str__(self):
-        states = "->".join((self.old_state.name, self.new_state.name))
-        parts = [str(self.sn), str(self.stamp),
-                 self.hash, repr(self.stuff), states]
-        return "Record [{}]".format(", ".join(parts))
+        return f"Record [{self.sn}, {self.stamp}, {self.hash}, " \
+               f"{self.stuff!r}, {self.old_state.name}->{self.new_state.name}]"
 
     def __bool__(self):
         return self.sn > 0

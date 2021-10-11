@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 from datetime import datetime, timezone
-from enum import IntEnum
+from enum import IntEnum, Enum
 from pathlib import Path
 from sqlite3 import Cursor
 from textwrap import wrap, shorten
@@ -34,16 +34,21 @@ sqlite3.register_converter("PHASE", lambda b: Phase(int(b)))
 Sequence = NewType('Sequence', int)
 Params = Union[dict, tuple]
 Operation = tuple[str, Params]
-Transition = tuple[Phase, Phase]
 
-TRANSITIONS: dict[Transition, str] = {
-    (Phase.ABSENT, Phase.ACTIVE): "add",
-    (Phase.ACTIVE, Phase.HIDDEN): "forget",
-    (Phase.ACTIVE, Phase.DONE): "tick",
-    (Phase.HIDDEN, Phase.ACTIVE): "undo forget",
-    (Phase.DONE, Phase.ACTIVE): "undo tick",
-    (Phase.ABSENT, Phase.HIDDEN): "INIT"
-}
+
+class Transition(Enum):
+    ADD = (Phase.ABSENT, Phase.ACTIVE)
+    FORGET = (Phase.ACTIVE, Phase.HIDDEN)
+    TICK = (Phase.ACTIVE, Phase.DONE)
+    UNFORGET = (Phase.HIDDEN, Phase.ACTIVE)
+    UNTICK = (Phase.DONE, Phase.ACTIVE)
+    INIT = (Phase.ABSENT, Phase.HIDDEN)
+
+    def __str__(self):
+        return self.name.lower()
+
+    def __repr__(self):
+        return f"Phases [{self.value[0].name}->{self.value[1].name}]"
 
 
 class Epoch(int):
@@ -113,8 +118,8 @@ class Record(NamedTuple):
     def canonical(self):
         return f"Record [{self.sn},{self.hash}]"
 
-    def act(self) -> tuple[Phase, Phase]:
-        return (self.old_state, self.new_state)
+    def act(self) -> Transition:
+        return Transition((self.old_state, self.new_state))
 
 
 def record_or_default(row) -> Record:
@@ -176,14 +181,13 @@ class Stuff(NamedTuple):
 class Change(NamedTuple):
     parent: Record
     stuff: Stuff
-    act: tuple[Phase, Phase]
+    act: Transition
     stamp: Epoch
     tags: list[Tag]
 
     def canonical(self) -> str:
-        phases = f"Phases [{self.act[0].name}->{self.act[1].name}]"
-        parts = [self.parent.canonical(), self.stuff.canonical(self.act[1]),
-                 phases, canonical_tags(self.tags)]
+        parts = [self.parent.canonical(), self.stuff.canonical(
+            self.act.value[1]), repr(self.act), canonical_tags(self.tags)]
         return "Change [{}]".format(",".join(parts))
 
     def hash(self) -> str:
@@ -193,7 +197,7 @@ class Change(NamedTuple):
 
     def record(self) -> Record:
         return Record(self.parent.next(), self.hash(), self.stuff.id,
-                      self.stamp, self.act[0], self.act[1])
+                      self.stamp, self.act.value[0], self.act.value[1])
 
 
 class Mind():
@@ -415,8 +419,8 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
 
 
 def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> None:
-    phases = (old_stuff.state, new_state)
-    change = Change(mind.head(), old_stuff, phases, Epoch.now(), [])
+    change = Change(mind.head(), old_stuff,
+                    Transition((old_stuff.state, new_state)), Epoch.now(), [])
     logging.debug(f"Canonical update: {change.canonical()}")
     rcd = change.record()
     ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
@@ -460,7 +464,7 @@ def hist_row(i: int, row: tuple[int, str, Epoch, Epoch, Phase, Phase, str,
                                 Optional[str]]) -> str:
     stuff = Stuff(id=row[2], body=row[6], state=row[5])
     tags = "Tags [{}]".format(row[7] if row[7] else " ")
-    command = TRANSITIONS[(row[4], row[5])]
+    command = Transition((row[4], row[5]))
     return f"{i}. {command:>7} {row[3]} -> {stuff.preview()} {tags}"
 
 
@@ -480,8 +484,8 @@ def add_content(mind: Mind, content: list[str],
                 state: Phase = Phase.ACTIVE) -> list[str]:
     stuff, tags, timestamp = new_stuff(content, state)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
-    phases = (Phase.ABSENT, state)
-    change = Change(mind.head(), stuff, phases, timestamp, tags)
+    change = Change(mind.head(), stuff, Transition((Phase.ABSENT, state)),
+                    timestamp, tags)
     logging.debug(f"Canonical change: {change.canonical()}")
     record = change.record()
     logging.debug(f"New record: {record}")

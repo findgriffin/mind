@@ -1,3 +1,7 @@
 mypy
 flake8
 coverage
+
+# For import_evernote.py script
+lxml
+markdownify

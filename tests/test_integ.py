@@ -9,6 +9,7 @@ from mind import mind
 class TestInteg(unittest.TestCase):
     """ Test components at higher level, to check that things work together."""
     MEM = ":memory:"
+    LATEST_SCHEMA = 8
 
     def test_logging_setup(self):
         # Given
@@ -33,7 +34,7 @@ class TestInteg(unittest.TestCase):
         self.assertTrue(output[0].endswith("Tags [markdown, nohello]"))
 
     def test_old_schemas(self):
-        for i in range(1, 6):
+        for i in range(1, self.LATEST_SCHEMA - 1):
             path = Path(f"tests/data/schema-v{i}.db")
             with self.subTest(f"Testing old schema: {path}"):
                 # When
@@ -46,7 +47,7 @@ class TestInteg(unittest.TestCase):
 
     def test_latest_schema(self):
         # Given
-        path = Path("tests/data/schema-v7.db")
+        path = Path(f"tests/data/schema-v{self.LATEST_SCHEMA}.db")
         # When
         with mind.Mind(path, strict=True):
             pass

@@ -173,7 +173,7 @@ class Stuff(NamedTuple):
         return f"Stuff[{self.id!r},{self.state.name},{self.body}]"
 
     def hash(self):
-        sha = hashlib.sha1()
+        sha = hashlib.sha256()
         sha.update(self.__repr__())
         return sha.hexdigest()
 
@@ -191,7 +191,7 @@ class Change(NamedTuple):
         return "Change [{}]".format(",".join(parts))
 
     def hash(self) -> str:
-        sha = hashlib.sha1()
+        sha = hashlib.sha256()
         sha.update(self.canonical().encode(UTF8))
         return sha.hexdigest()
 

@@ -1,0 +1,66 @@
+<!doctype html>
+<html class="no-js" lang="">
+
+<head>
+  <meta charset="utf-8">
+  <title>Mind</title>
+  <meta name="description" content="Let me mind your stuff.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="manifest" href="site.webmanifest">
+  <link rel="apple-touch-icon" href="icon.png">
+  <!-- Place favicon.ico in the root directory -->
+
+
+  <meta name="theme-color" content="#fafafa">
+  <style>
+    html, body {
+      margin: 0;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-family: "Verdana", sans-serif;
+      font-weight: lighter;
+      color: darkblue;
+      letter-spacing: .2rem;
+      margin: .5rem 1rem
+    }
+    .emphasis {
+      color: darkred;
+    }
+    p {
+      font-family: "Georgia", serif;
+    }
+    form {
+      max-width: 30rem;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 30rem;
+    }
+    input, button {
+      font-family: Consolas, monospace;
+      border: none;
+      font-size: large;
+      margin: 1rem;
+      display: block;
+      width: 80%;
+      border-radius: 5px;
+      padding: .5rem;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Add your site or application content here -->
+  <form action="/login">
+    <h2><span class="emphasis">m</span>ind</h2>
+    <div><input name="name" type="text" placeholder="Name" required></div>
+    <div><input name="password" type="password"
+                placeholder="Password" required></div>
+    <button type="submit">Enter</button>
+  </form>
+  <script src="js/app.js"></script>
+</body>
+
+</html>

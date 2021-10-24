@@ -53,17 +53,51 @@
 
 <body>
   <!-- Add your site or application content here -->
-  <form action="/login">
+  <form name="loginForm" id="login-form">
     <h2><span class="emphasis">m</span>ind</h2>
     <div><input name="name" type="text" placeholder="Name" required></div>
-    <div><input name="password" type="password"
-                placeholder="Password" required></div>
-    <button type="submit">Enter</button>
+    <button type="submit">Login</button>
   </form>
-  <script src="js/app.js"></script>
 </body>
 
 <script>
+  // Configure your application and authorization server details
+  // https://accounts.google.com/.well-known/openid-configuration
+  var config = {
+    client_id: "375394693907-nqqhk9245ec5qalcm4ana0u55gqpo0be.apps.googleusercontent.com",
+    redirect_uri: "http://localhost:8000/index.html",
+    authorization_endpoint: "https://accounts.google.com/o/oauth2/v2/auth",
+    token_endpoint: "https://oauth2.googleapis.com/token",
+    requested_scopes: "openid profile email",
+    userinfo_url: "https://openidconnect.googleapis.com/v1/userinfo"
+  };
+  async function oauth_login(e) {
+    console.log("Doing OAuth Login")
+    e.preventDefault()
+    alert("Logging in " + document.loginForm.name.value);
+    // Create and store a random "state" value
+    state = generateRandomString()
+    localStorage.setItem("pkce_state", state);
+    // Create and store a new PKCE code_verifier (the plaintext random secret)
+    code_verifier = generateRandomString()
+    localStorage.setItem("pkce_code_verifier", code_verifier);
+    // Hash and base64-urlencode the secret to use as the challenge
+    var code_challenge = await pkceChallengeFromVerifier(code_verifier);
+    // Build the authorization URL
+    var url = config.authorization_endpoint
+            + "?response_type=code"
+            + "&client_id="+encodeURIComponent(config.client_id)
+            + "&state="+encodeURIComponent(state)
+            + "&scope="+encodeURIComponent(config.requested_scopes)
+            + "&redirect_uri="+encodeURIComponent(config.redirect_uri)
+            + "&code_challenge="+encodeURIComponent(code_challenge)
+            + "&code_challenge_method=S256"
+    ;
+    // Redirect to the authorization server
+    alert("Redirecting to " + url);
+    window.location = url;
+  }
+  document.getElementById("login-form").addEventListener("submit", oauth_login);
   //////////////////////////////////////////////////////////////////////
   // GENERAL HELPER FUNCTIONS
 

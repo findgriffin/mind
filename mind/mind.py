@@ -242,10 +242,8 @@ class Mind():
         cur = self.query("SELECT * FROM stuff WHERE id=?", (record.stuff, ))
         stuff = Stuff(*cur.fetchone())
         logging.debug(f"Verifying {record}, {stuff}")
-        if record.new_state == Phase.ACTIVE:
-            tags = QueryTags(id=stuff.id).execute(self)
-        else:
-            tags = []
+        is_active = record.new_state == Phase.ACTIVE
+        tags = QueryTags(id=stuff.id).execute(self) if is_active else []
         parent = self.get_record(record.parent())
         change = Change(parent, stuff, record.act(), record.stamp, tags)
         calc_hash = change.hash()
@@ -289,18 +287,11 @@ class QueryStuff(NamedTuple):
         return "DESC" if self.latest else "ASC"
 
     def cmd(self):
-        parts = ["SELECT stuff.id, stuff.body FROM stuff"]
-        if self.tag:
-            parts.append("INNER JOIN tags ON stuff.id = tags.id ")
-            parts.append("WHERE tags.tag = :tag")
-            if self.state:
-                parts.append("AND stuff.state = :state")
-        else:
-            if self.state:
-                parts.append("WHERE stuff.state = :state")
-        parts.append(f"ORDER BY stuff.id {self.order()}")
-        parts.append("LIMIT :limit OFFSET :offset")
-        return SPACE.join(parts)
+        join1 = "INNER JOIN tags ON stuff.id = tags.id" if self.tag else ""
+        join2 = "AND tags.tag = :tag" if self.tag else ""
+        return f"SELECT stuff.id, stuff.body FROM stuff {join1} "\
+               f"WHERE stuff.state = :state {join2} " \
+               f"ORDER BY stuff.id {self.order()} LIMIT :limit OFFSET :offset"
 
     def execute(self, mind: Mind) -> list[Stuff]:
         cur = mind.query(self.cmd(), self._asdict())
@@ -315,8 +306,8 @@ class QueryTags(NamedTuple):
         if self.id:
             return "SELECT * FROM tags WHERE id=:id ORDER BY tag ASC"
         else:
-            return SPACE.join(["SELECT MAX(id), tag FROM tags GROUP BY tag",
-                               "ORDER BY id DESC LIMIT :limit"])
+            return "SELECT MAX(id), tag FROM tags GROUP BY tag " \
+                   "ORDER BY id DESC LIMIT :limit"
 
     def execute(self, mind: Mind) -> list[Tag]:
         cur = mind.query(self.cmd(), self._asdict())
@@ -324,10 +315,8 @@ class QueryTags(NamedTuple):
 
 
 def build_create_table_cmd(table_name: str, schema) -> str:
-    columns = []
-    for column in schema.__annotations__.items():
-        name = column[0]
-        columns.append(SPACE.join((name, TYPE_MAP[column[1]](column[0]))))
+    cols = schema.__annotations__.items()
+    columns = [SPACE.join((col[0], TYPE_MAP[col[1]](col[0]))) for col in cols]
     const = schema.constraints()
     c_clauses = ", " + ", ".join(const) if const else ""
     return f"CREATE TABLE {table_name}({', '.join(columns)}{c_clauses})"
@@ -460,14 +449,10 @@ def hist_row(i: int, row: tuple[int, str, Epoch, Epoch, Phase, Phase, str,
 
 
 def do_history(mind: Mind, args: argparse.Namespace) -> list[str]:
-    cmd = SPACE.join(
-        ["SELECT log.*, stuff.body, "
-         "group_concat(tags.tag)", "FROM log",
-         "INNER JOIN stuff ON log.stuff = stuff.id",
-         "LEFT JOIN tags ON stuff.id = tags.id",
-         "GROUP BY log.sn",
-         "ORDER BY log.sn DESC LIMIT 9"])
-    cur = mind.query(cmd, ())
+    cur = mind.query("SELECT log.*, stuff.body, group_concat(tags.tag) "
+                     "FROM log INNER JOIN stuff ON log.stuff = stuff.id "
+                     "LEFT JOIN tags ON stuff.id = tags.id "
+                     "GROUP BY log.sn ORDER BY log.sn DESC LIMIT 9", ())
     return [hist_row(i, r) for i, r in enumerate(cur.fetchall(), 1)]
 
 

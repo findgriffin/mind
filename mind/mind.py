@@ -208,7 +208,7 @@ class Mind():
             if not exists:
                 for name, schema in self.tables.items():
                     con.execute(build_create_table_cmd(name, schema))
-                add_content(self, [""], state=Phase.HIDDEN)
+                add_content(self, [""], state=Phase.HIDDEN, parent=Record())
         self.verify()
 
     def __enter__(self):
@@ -236,8 +236,7 @@ class Mind():
 
     def head(self) -> Record:
         cmd = "SELECT * FROM log ORDER BY sn DESC LIMIT 1"
-        row = self.query(cmd, ()).fetchone()
-        return Record(*row) if row else Record()
+        return Record(*self.query(cmd, ()).fetchone())
 
     def _verify(self, record: Record) -> Record:
         cur = self.query("SELECT * FROM stuff WHERE id=?", (record.stuff, ))
@@ -262,8 +261,6 @@ class Mind():
     def verify(self) -> None:
         try:
             parent = self.head()
-            if parent.sn < 1:
-                raise IntegrityError("Head must not be default Record.")
             while parent:
                 parent = self._verify(parent)
         except IntegrityError as err:
@@ -474,12 +471,12 @@ def do_history(mind: Mind, args: argparse.Namespace) -> list[str]:
     return [hist_row(i, r) for i, r in enumerate(cur.fetchall(), 1)]
 
 
-def add_content(mind: Mind, content: list[str],
-                state: Phase = Phase.ACTIVE) -> list[str]:
+def add_content(mind: Mind, content: list[str], state: Phase = Phase.ACTIVE,
+                parent: Optional[Record] = None) -> list[str]:
     stuff, tags, timestamp = new_stuff(content, state)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
-    change = Change(mind.head(), stuff, Transition((Phase.ABSENT, state)),
-                    timestamp, tags)
+    change = Change(mind.head() if parent is None else parent, stuff,
+                    Transition((Phase.ABSENT, state)), timestamp, tags)
     logging.debug(f"Canonical change: {change.canonical()}")
     record = change.record()
     logging.debug(f"New record: {record}")

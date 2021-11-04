@@ -22,10 +22,8 @@ STUFF = "stuff"
 TAG = "tag"
 TAGS = "tags"
 TAG_PREFIX = "#"
-UTF8 = "utf-8"
 PAGE_SIZE = 9
-VIEW_WIDTH = 80
-H_RULE = "-" * VIEW_WIDTH
+H_RULE = "-" * 80
 
 
 Phase = IntEnum("Phase", "ABSENT ACTIVE DONE HIDDEN")
@@ -192,7 +190,7 @@ class Change(NamedTuple):
 
     def hash(self) -> str:
         sha = hashlib.sha1()
-        sha.update(self.canonical().encode(UTF8))
+        sha.update(self.canonical().encode("utf-8"))
         return sha.hexdigest()
 
     def record(self) -> Record:

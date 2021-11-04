@@ -45,18 +45,20 @@ class TestPerf(unittest.TestCase):
         # When
         start = datetime.now()
         with mind.Mind(db_path, strict=True) as sesh:
-            for i in range(200):
+            init = datetime.now()
+            for i in range(100):
                 lines = [" ".join(
                     [word()] * randint(12, 16))] * randint(40, 100)
-                lines.append(" #".join([word()]) * randint(10, 15))
+                lines.append(" #".join([word()]) * randint(20, 40))
                 mind.add_content(sesh, content=lines)
             finish = datetime.now()
         verified = datetime.now()
         # File size: os.stat(db_name).st_size / 1024)
         os.remove(db_path)
 
-        # Then
-        self.assertLess((finish - start).seconds, 1)
+        # Then init, add 100 complex items, and verify all take <1 sec
+        self.assertLess((init - start).seconds, 1)
+        self.assertLess((finish - init).seconds, 1)
         self.assertLess((verified - finish).seconds, 1)
         self.assertFalse(db_path.exists())
 

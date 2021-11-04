@@ -50,12 +50,14 @@ class TestPerf(unittest.TestCase):
                     [word()] * randint(12, 16))] * randint(40, 100)
                 lines.append(" #".join([word()]) * randint(10, 15))
                 mind.add_content(sesh, content=lines)
-        finish = datetime.now()
+            finish = datetime.now()
+        verified = datetime.now()
         # File size: os.stat(db_name).st_size / 1024)
         os.remove(db_path)
 
         # Then
         self.assertLess((finish - start).seconds, 1)
+        self.assertLess((verified - finish).seconds, 1)
         self.assertFalse(db_path.exists())
 
     @skip

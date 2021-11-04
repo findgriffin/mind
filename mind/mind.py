@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from enum import IntEnum, Enum
 from pathlib import Path
-from sqlite3 import Cursor
+from sqlite3 import Cursor, PARSE_DECLTYPES
 from textwrap import wrap, shorten
 from typing import NamedTuple, Callable, Optional, NewType, Union
 import argparse
@@ -32,6 +32,10 @@ sqlite3.register_converter("PHASE", lambda b: Phase(int(b)))
 Sequence = NewType('Sequence', int)
 Params = Union[dict, tuple]
 Operation = tuple[str, Params]
+
+
+class IntegrityError(Exception):
+    pass
 
 
 class Transition(Enum):
@@ -206,24 +210,14 @@ class Mind():
         path = Path(filename).expanduser()
         exists = path.exists()
         logging.debug(f"Opening DB {path}, exists: {path.exists()}")
-        with sqlite3.connect(path,
-                             detect_types=sqlite3.PARSE_DECLTYPES) as con:
-            for name, schema in self.tables.items():
-                create_cmd = build_create_table_cmd(name, schema)
-                if exists:
-                    row = con.execute("SELECT * FROM sqlite_master WHERE "
-                                      "name=?", [name]).fetchone()
-                    if not row or row[4] != create_cmd:
-                        msg = f"Error for table {name}. Found: {row}"
-                        logging.debug(msg)
-                        if strict:
-                            raise RuntimeError(msg)
-                else:
-                    con.execute(create_cmd)
+        with sqlite3.connect(path, detect_types=PARSE_DECLTYPES) as con:
             con.execute("PRAGMA foreign_keys = ON")
             self.con = con
             if not exists:
+                for name, schema in self.tables.items():
+                    con.execute(build_create_table_cmd(name, schema))
                 add_content(self, [""], state=Phase.HIDDEN)
+        self.verify()
 
     def __enter__(self):
         return self
@@ -267,13 +261,21 @@ class Mind():
         if calc_hash == record.hash:
             logging.debug(f"Verified: {record}")
         else:
-            raise Exception(f"Hash mismatch\nRetrieved: {record}\n{computed}")
+            raise IntegrityError(f"Hash mismatch\nRetrieved: {record}\n"
+                                 f"Computed: {computed}")
         return parent
 
     def verify(self) -> None:
-        parent = self.head()
-        while parent:
-            parent = self._verify(parent)
+        try:
+            parent = self.head()
+            if parent.sn < 1:
+                raise IntegrityError("Head must not be default Record.")
+            while parent:
+                parent = self._verify(parent)
+        except IntegrityError as err:
+            raise err
+        except Exception as exc:
+            raise IntegrityError(f"Unknown error {exc}")
 
 
 def parse_item(args: list[str]) -> int:
@@ -548,7 +550,6 @@ COMMANDS = {
 def run(args: argparse.Namespace) -> list[str]:
     logging.debug(f"Running with arguments: {args}")
     with Mind(args.db) as mind:
-        mind.verify()
         if args.cmd in COMMANDS:
             return COMMANDS[args.cmd].do(mind, args)
         else:

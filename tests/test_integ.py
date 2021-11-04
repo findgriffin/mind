@@ -37,12 +37,9 @@ class TestInteg(unittest.TestCase):
             path = Path(f"tests/data/schema-v{i}.db")
             with self.subTest(f"Testing old schema: {path}"):
                 # When
-                with self.assertRaises(RuntimeError) as context:
+                with self.assertRaises(mind.IntegrityError):
                     with mind.Mind(path, strict=True) as sesh:
                         mind.QueryStuff().execute(sesh)
-                # Then
-                self.assertIn("Error for table", str(context.exception))
-                self.assertIn("Found: ", str(context.exception))
 
     def test_latest_schema(self):
         # Given

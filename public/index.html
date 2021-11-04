@@ -58,6 +58,8 @@
     <div><input name="name" type="text" placeholder="Name" required></div>
     <button type="submit">Login</button>
   </form>
+  <a href="#" id="start-button">Click to Sign In</a>
+  <p id="oauth-url"></p>
 </body>
 
 <script>
@@ -94,10 +96,26 @@
             + "&code_challenge_method=S256"
     ;
     // Redirect to the authorization server
-    alert("Redirecting to " + url);
+    document.getElementById("oauth-url").innerText = url
     window.location = url;
   }
   document.getElementById("login-form").addEventListener("submit", oauth_login);
+  document.getElementById("start-button").addEventListener("click", oauth_login);
+
+  //////////////////////////////////////////////////////////////////////
+  // OAUTH REDIRECT HANDLING
+
+  // Handle the redirect back from the authorization server and
+  // get an access token from the token endpoint
+
+  var q = parseQueryString(window.location.search.substring(1));
+
+  // Check if the server returned an error string
+  if(q.error) {
+    alert("Error returned from authorization server: "+q.error);
+    document.getElementById("error_details").innerText = q.error+"\n\n"+q.error_description;
+    document.getElementById("error").classList = "";
+  }
   //////////////////////////////////////////////////////////////////////
   // GENERAL HELPER FUNCTIONS
 

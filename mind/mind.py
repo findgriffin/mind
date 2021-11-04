@@ -93,12 +93,12 @@ TYPE_MAP: dict[type, Callable[[str], str]] = {
 
 
 class Record(NamedTuple):
-    sn: Sequence
-    hash: str
-    stuff: Epoch
-    stamp: Epoch
-    old_state: Phase
-    new_state: Phase
+    sn: Sequence = Sequence(0)
+    hash: str = ""
+    stuff: Epoch = Epoch(0)
+    stamp: Epoch = Epoch(0)
+    old_state: Phase = Phase.ABSENT
+    new_state: Phase = Phase.HIDDEN
 
     def __str__(self):
         return f"Record [{self.sn}, {self.stamp}, {self.hash}, " \
@@ -122,14 +122,6 @@ class Record(NamedTuple):
 
     def act(self) -> Transition:
         return Transition((self.old_state, self.new_state))
-
-
-def record_or_default(row) -> Record:
-    if row:
-        return Record(*row)
-    else:
-        return Record(Sequence(0), "", Epoch(0), Epoch(0),
-                      Phase.ABSENT, Phase.HIDDEN)
 
 
 class Tag(NamedTuple):
@@ -239,11 +231,13 @@ class Mind():
 
     def get_record(self, sn):
         cmd = "SELECT * FROM log WHERE sn = ?"
-        return record_or_default(self.query(cmd, (sn,)).fetchone())
+        row = self.query(cmd, (sn,)).fetchone()
+        return Record(*row) if row else Record()
 
     def head(self) -> Record:
         cmd = "SELECT * FROM log ORDER BY sn DESC LIMIT 1"
-        return record_or_default(self.query(cmd, ()).fetchone())
+        row = self.query(cmd, ()).fetchone()
+        return Record(*row) if row else Record()
 
     def _verify(self, record: Record) -> Record:
         cur = self.query("SELECT * FROM stuff WHERE id=?", (record.stuff, ))

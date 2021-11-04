@@ -1,6 +1,6 @@
 import unittest
 
-from mind.mind import Change, record_or_default, Record, Stuff, Phase, \
+from mind.mind import Change, Record, Stuff, Phase, \
     Sequence, Tag, Epoch, Transition
 
 E1 = Epoch(1)
@@ -12,7 +12,7 @@ class TestChange(unittest.TestCase):
 
     def test_first_entry(self):
         # Given
-        record = record_or_default(None)
+        record = Record()
         stuff = Stuff(Epoch(946684800), "", state=Phase.HIDDEN)
         # When
         canon = Change(record, stuff, Transition.INIT, E1, []).canonical()

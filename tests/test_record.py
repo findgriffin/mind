@@ -1,13 +1,13 @@
 import unittest
 
-from mind.mind import record_or_default, Record, Phase, Epoch
+from mind.mind import Record, Phase, Epoch
 
 
 class TestRecord(unittest.TestCase):
 
     def test_default(self):
         # Given / When
-        output = record_or_default(None)
+        output = Record()
         # Then
         self.assertEqual(output, Record(0, "", 0, output.stamp, Phase.ABSENT,
                                         Phase.HIDDEN))

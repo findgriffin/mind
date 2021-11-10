@@ -47,7 +47,7 @@ class TestInteg(unittest.TestCase):
         self.assertEqual(exit.exception.code, 0)
         self.assertIn("Hello!", stdout)
         self.assertIn("positional arguments:", stdout)
-        self.assertIn("options:\n  -h, --help", stdout)
+        self.assertIn("-h, --help", stdout)
         self.assertIn("-v, --verbose", stdout)
 
     def test_old_schemas(self):

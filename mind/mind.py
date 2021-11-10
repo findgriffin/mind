@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-from datetime import datetime, timezone
+from datetime import datetime as dt, timezone as tz
 from enum import IntEnum, Enum
 from pathlib import Path
 from sqlite3 import Cursor, PARSE_DECLTYPES
@@ -55,18 +55,15 @@ class Transition(Enum):
 
 class Epoch(int):
 
-    def __dt__(self) -> datetime:
-        return datetime.fromtimestamp(self / MICROS, timezone.utc)
-
     def __str__(self):
-        return self.__dt__().isoformat()[:16]
+        return dt.fromtimestamp(self / MICROS, tz.utc).isoformat()[:16]
 
     def __repr__(self):
         return hex(self)[2:]
 
     @classmethod
     def now(cls):
-        return cls(datetime.now(tz=timezone.utc).timestamp() * MICROS)
+        return cls(dt.now(tz=tz.utc).timestamp() * MICROS)
 
 
 sqlite3.register_adapter(Epoch, lambda e: e)

@@ -1,6 +1,6 @@
 from argparse import Namespace
+from contextlib import redirect_stdout
 from pathlib import Path
-import contextlib
 import io
 import logging
 import unittest
@@ -37,9 +37,8 @@ class TestInteg(unittest.TestCase):
     def test_help(self):
         # Given
         argv = ['-h']
-        stdout_buffer = io.StringIO()
         # When
-        with contextlib.redirect_stdout(stdout_buffer):
+        with redirect_stdout(io.StringIO()) as stdout_buffer:
             with self.assertRaises(SystemExit) as exit:
                 mind.setup(argv)
         stdout = stdout_buffer.getvalue()

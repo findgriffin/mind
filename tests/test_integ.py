@@ -1,7 +1,9 @@
-import logging
-import unittest
 from argparse import Namespace
 from pathlib import Path
+import contextlib
+import io
+import logging
+import unittest
 
 from mind import mind
 
@@ -31,6 +33,23 @@ class TestInteg(unittest.TestCase):
         self.assertTrue(output[0].startswith("Added "))
         self.assertIn(" -> # This is how you Markdown", output[0])
         self.assertTrue(output[0].endswith("Tags [markdown, nohello]"))
+
+    def test_help(self):
+        # Given
+        argv = ['-h']
+        stdout_buffer = io.StringIO()
+        # When
+        with contextlib.redirect_stdout(stdout_buffer):
+            with self.assertRaises(SystemExit) as exit:
+                mind.setup(argv)
+        stdout = stdout_buffer.getvalue()
+
+        # Then
+        self.assertEqual(exit.exception.code, 0)
+        self.assertIn("Hello!", stdout)
+        self.assertIn("positional arguments:", stdout)
+        self.assertIn("options:\n  -h, --help", stdout)
+        self.assertIn("-v, --verbose", stdout)
 
     def test_old_schemas(self):
         for i in range(1, 6):

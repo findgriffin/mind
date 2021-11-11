@@ -551,8 +551,12 @@ def setup(argv) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-if __name__ == "__main__":
-    args = setup(sys.argv[1:])
+def main(argv: list[str]) -> list[str]:
+    args = setup(argv)
     setup_logging(verbose=args.verbose)
-    for line in run(args):
+    return run(args)
+
+
+if __name__ == "__main__":
+    for line in main(sys.argv[1:]):
         print(line)

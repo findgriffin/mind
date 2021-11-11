@@ -50,6 +50,18 @@ class TestInteg(unittest.TestCase):
         self.assertIn("-h, --help", stdout)
         self.assertIn("-v, --verbose", stdout)
 
+    def test_no_args(self):
+        # Given
+        argv = []
+        # When
+        output = mind.main(argv)
+        # Then
+        self.assertEqual(output[0],
+                         " # Currently minding [latest] [ALL] [num=9]...")
+        self.assertEqual(output[-3], "-" * 80)
+        self.assertEqual(output[-2][:15], "  Latest tags: ")
+        self.assertEqual(output[-1], "-" * 80)
+
     def test_old_schemas(self):
         for i in range(1, 6):
             path = Path(f"tests/data/schema-v{i}.db")

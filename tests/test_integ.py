@@ -5,6 +5,8 @@ import io
 import logging
 import unittest
 
+from unittest.mock import patch
+
 from mind import mind
 
 
@@ -61,6 +63,16 @@ class TestInteg(unittest.TestCase):
         self.assertEqual(output[-3], "-" * 80)
         self.assertEqual(output[-2][:15], "  Latest tags: ")
         self.assertEqual(output[-1], "-" * 80)
+
+    def test_add__interactive(self):
+        # Given
+        argv = ["add"]
+        test_input = "Some stuff here"
+        with patch("builtins.input", return_value=test_input):
+            # When
+            output = mind.main(argv)
+        # Then
+        self.assertEqual(output[0][-27:], f" -> {test_input} Tags []")
 
     def test_old_schemas(self):
         for i in range(1, 6):

@@ -474,10 +474,8 @@ def do_add(mind: Mind, args: argparse.Namespace) -> list[str]:
         return add_content(mind, [args.text])
     elif args.file:
         return add_content(mind, Path(args.file).read_text().splitlines())
-    elif args.interactive:
-        raise NotImplementedError
     else:
-        raise NotImplementedError
+        return add_content(mind, [input("Add stuff: ")])
 
 
 class Command(NamedTuple):
@@ -502,14 +500,13 @@ def add_add_cmd(sub_parsers, name, help):
     add = sub_parsers.add_parser(name, help=help)
     add_group = add.add_mutually_exclusive_group()
     add_group.add_argument("--file", type=str, help="Add stuff from a file.")
-    add_group.add_argument("-i", "--interactive", action="store_true",
-                           help="Add stuff interactively.")
     add_group.add_argument("-t", "--text", type=str,
                            help="Add text from the command line")
 
 
 COMMANDS = {
-    "add":      Command(do=do_add, add=add_add_cmd, help="Add stuff to mind."),
+    "add":      Command(do=do_add, add=add_add_cmd,
+                        help="Add stuff to mind."),
     CLEAN:      Command(do=do_list, add=add_list_cmd,
                         help="List oldest stuff, so you can clean it up ;)."),
     "forget":   Command(do_forget, add_command, "Which stuff to forget."),

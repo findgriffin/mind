@@ -1,5 +1,4 @@
 import unittest
-from argparse import Namespace
 from io import StringIO
 from unittest.mock import patch
 
@@ -43,8 +42,3 @@ class TestParser(unittest.TestCase):
         # Then
         self.assertEqual(result.cmd, input[0])
         self.assertEqual(result.file, input[2])
-
-    def test_add_content_interactive(self):
-        with self.assertRaises(NotImplementedError):
-            namespace = Namespace(text=False, file=False, interactive=False)
-            mind.do_add(None, namespace)

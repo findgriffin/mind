@@ -19,9 +19,7 @@ MICROS = 1e6
 NEWLINE = "\n"
 SPACE = " "
 STUFF = "stuff"
-TAG = "tag"
 TAGS = "tags"
-TAG_PREFIX = "#"
 PAGE_SIZE = 9
 H_RULE = "-" * 80
 
@@ -321,7 +319,7 @@ def build_create_table_cmd(table_name: str, schema) -> str:
 
 
 def is_tag(word: str) -> Optional[str]:
-    if len(word) > 1 and word.startswith(TAG_PREFIX):
+    if len(word) > 1 and word.startswith(FilterType.TAG.value):
         candidate = word[1:]
         if candidate.isalnum():
             return candidate.lower()

@@ -21,15 +21,18 @@ class TestPerf(unittest.TestCase):
         # Given
         random_chars = "".join(choices(ascii_lowercase, k=11))
         db_path = Path(f"/tmp/testrun-{random_chars}.db").expanduser()
+        items = 1000
+        page_size = 50
         with mind.Mind(db_path, strict=True) as sesh:
-            for i in range(1000):
+            for i in range(items):
                 letters = choices(ascii_letters, k=11)
                 tag = choices(digits, k=4)
                 mind.add_content(sesh, content=[f"{letters} #{tag}"])
             # When
             start = datetime.now()
             for i in range(200):
-                mind.do_list(sesh, Namespace(cmd=None, num=50, page=1))
+                mind.do_list(sesh, Namespace(cmd=None, num=page_size,
+                                             page=(i % (items/page_size))))
         finish = datetime.now()
         os.remove(db_path)
 

@@ -14,13 +14,7 @@ from unittest.mock import patch
 
 from mind.mind import Mind, QueryStuff, add_content, \
     QueryTags, do_list, do_forget, do_tick, do_add, do_show
-
-
-def setup_context(testcase, cm):
-    """Use a contextmanager to setUp a test case."""
-    val = cm.__enter__()
-    testcase.addCleanup(cm.__exit__, None, None, None)
-    return val
+from tests import setup_context
 
 
 class TestSQLite(unittest.TestCase):

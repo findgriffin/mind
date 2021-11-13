@@ -196,7 +196,7 @@ class Mind():
     def __init__(self, filename: str, strict: bool = False) -> None:
         self.strict = strict
         path = Path(filename).expanduser()
-        exists = path.exists()
+        exists = path.exists() and path.stat().st_size
         logging.debug(f"Opening DB {path}, exists: {path.exists()}")
         with sqlite3.connect(path, detect_types=PARSE_DECLTYPES) as con:
             con.execute("PRAGMA foreign_keys = ON")

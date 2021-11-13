@@ -27,6 +27,7 @@ H_RULE = "-" * 80
 
 
 Phase = IntEnum("Phase", "ABSENT ACTIVE DONE HIDDEN")
+FilterType = Enum("FilterType", (("ALL", None), ("TAG", "#")))
 sqlite3.register_adapter(Phase, lambda s: s.value)
 sqlite3.register_converter("PHASE", lambda b: Phase(int(b)))
 Sequence = NewType('Sequence', int)
@@ -349,14 +350,25 @@ def new_stuff(hunks: list[str], state: Phase,
     return Stuff(now, joiner.join(cleaned), state), tag_set, now
 
 
-# Always returns lowercase
-def parse_filter(arg: str):
-    if arg.isalnum():
-        return (TAG, arg.lower())
-    elif arg.startswith(TAG_PREFIX):
-        return (TAG, arg[1:].lower())
+class Filter(NamedTuple):
+    ft: FilterType = FilterType.ALL
+    val: Optional[str] = None
+
+    def __str__(self):
+        return f"{self.ft.name}={self.val}" if self.val else self.ft.name
+
+
+def parse_filter(arg: Optional[str]) -> Filter:
+    if arg:
+        if arg.isalnum():
+            return Filter(ft=FilterType.TAG, val=arg.lower())
+        else:
+            for ft in FilterType:
+                if ft.value and arg.startswith(ft.value):
+                    return Filter(ft, arg.lstrip(ft.value))
+            raise ValueError(f"Unknown filter: {arg}")
     else:
-        raise ValueError(f"Unknown filter: {arg}")
+        return Filter()
 
 
 def order_and_filter(args: argparse.Namespace) -> tuple[bool, Optional[str]]:
@@ -369,18 +381,16 @@ def order_and_filter(args: argparse.Namespace) -> tuple[bool, Optional[str]]:
 
 
 def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
-    latest, filter = order_and_filter(args)
+    latest, filter_arg = order_and_filter(args)
+    filter = parse_filter(filter_arg)
     logging.debug(f"Listing latest: {latest} filter: {filter}")
-    filter_desc = "ALL"
-    if filter:
-        parsed = parse_filter(filter)
-        filter_desc = "=".join(parsed)
-        fetched = QueryStuff(latest=latest, tag=parsed[1],
-                             limit=args.num+1).execute(mind)
-    else:
-        fetched = QueryStuff(latest=latest, limit=args.num+1).execute(mind)
+    offset = (args.page - 1) * args.num
+    fetched = QueryStuff(latest=latest,
+                         tag=filter.val,
+                         offset=offset,
+                         limit=args.num+1).execute(mind)
     noun = "latest" if latest else "oldest"
-    output = [f" # Currently minding [{noun}] [{filter_desc}] "
+    output = [f" # Currently minding [{noun}] [{filter}] "
               f"[num={args.num}]...", H_RULE]
     if fetched:
         for index, row in enumerate(fetched[:args.num], 1):
@@ -437,20 +447,22 @@ def do_show(mind: Mind, args: argparse.Namespace) -> list[str]:
         return [f"Stuff [{id}] not found."]
 
 
-def hist_row(i: int, row: tuple[int, str, Epoch, Epoch, Phase, Phase, str,
-                                Optional[str]]) -> str:
-    stuff = Stuff(id=row[2], body=row[6], state=row[5])
-    tags = "Tags [{}]".format(row[7] if row[7] else " ")
+def hist_row(row: tuple[int, str, Epoch, Epoch, Phase, Phase, str,
+                        Optional[str]]) -> str:
+    stuff = Stuff(id=row[2], body=row[6], state=row[5]).preview()
+    tags = "Tags [{}]".format(row[7] or " ")
     command = Transition((row[4], row[5]))
-    return f"{i}. {command:>7} {row[3]} -> {stuff.preview()} {tags}"
+    return f"{row[0]}. {row[1][:6]} {command:>7} {row[3]} -> {stuff} {tags}"
 
 
 def do_history(mind: Mind, args: argparse.Namespace) -> list[str]:
     cur = mind.query("SELECT log.*, stuff.body, group_concat(tags.tag) "
                      "FROM log INNER JOIN stuff ON log.stuff = stuff.id "
                      "LEFT JOIN tags ON stuff.id = tags.id "
-                     "GROUP BY log.sn ORDER BY log.sn DESC LIMIT 9", ())
-    return [hist_row(i, r) for i, r in enumerate(cur.fetchall(), 1)]
+                     "GROUP BY log.sn ORDER BY log.sn DESC "
+                     "LIMIT :limit OFFSET :offset ",
+                     {"offset": (args.page - 1) * args.num, "limit": args.num})
+    return [hist_row(row) for row in cur.fetchall()]
 
 
 def add_content(mind: Mind, content: list[str], state: Phase = Phase.ACTIVE,
@@ -494,6 +506,8 @@ def add_list_cmd(sub_parsers, name, help):
     sub_parser = add_command(sub_parsers, name, help, nargs='?')
     sub_parser.add_argument("-n", "--num", type=int, default=PAGE_SIZE,
                             help="How much stuff to list.")
+    sub_parser.add_argument("-p", "--page", type=int, default=1,
+                            help="Which page of results to list.")
 
 
 def add_add_cmd(sub_parsers, name, help):
@@ -524,6 +538,7 @@ def run(args: argparse.Namespace) -> list[str]:
             return COMMANDS[args.cmd].do(mind, args)
         else:
             args.num = PAGE_SIZE
+            args.page = 1
             return do_list(mind, args)
 
 

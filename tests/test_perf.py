@@ -29,7 +29,7 @@ class TestPerf(unittest.TestCase):
             # When
             start = datetime.now()
             for i in range(200):
-                mind.do_list(sesh, Namespace(cmd=None, num=50))
+                mind.do_list(sesh, Namespace(cmd=None, num=50, page=1))
         finish = datetime.now()
         os.remove(db_path)
 

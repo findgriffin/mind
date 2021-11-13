@@ -107,7 +107,7 @@ class TestSQLite(unittest.TestCase):
         # Given
         with Mind(self.MEM, strict=True) as sesh:
             # When
-            output = do_list(sesh, Namespace(cmd=None, num=1000))
+            output = do_list(sesh, Namespace(cmd=None, num=1000, page=1))
             # Then
             self.assertEqual("  Hmm, couldn't find anything here.", output[2])
 
@@ -182,8 +182,8 @@ class TestSQLite(unittest.TestCase):
                 excluded.append(do_tick(sesh, Namespace(tick=f"{2}"))[0])
                 excluded.append(do_forget(sesh, Namespace(forget=f"{2}"))[0])
             # When
-            tag_0 = do_list(sesh, Namespace(list="0", num=10))
-            tag_1 = do_list(sesh, Namespace(list="1", num=10))
+            tag_0 = do_list(sesh, Namespace(list="0", num=10, page=1))
+            tag_1 = do_list(sesh, Namespace(list="1", num=10, page=1))
 
             excluded_set = set([text.split(sep)[-1] for text in excluded])
             tag_0_set = set([text.split(sep)[-1] for text in tag_0[2:-4]])

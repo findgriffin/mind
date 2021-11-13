@@ -263,11 +263,9 @@ class Mind():
             raise IntegrityError(f"Unknown error {exc}")
 
 
-def parse_item(args: list[str]) -> int:
-    if len(args) != 1:
-        raise NotImplementedError("Only one item currently supported.")
-    elif args[0].isdigit():
-        return int(args[0])
+def parse_item(arg: str) -> int:
+    if arg.isdigit():
+        return int(arg)
     else:
         raise NotImplementedError("Only numbered items currently supported.")
 
@@ -414,9 +412,8 @@ def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> None:
     mind.tx(ops)
 
 
-def do_state_change(mind: Mind, args: list[str],
-                    state: Phase) -> list[str]:
-    id = parse_item(args)
+def do_state_change(mind: Mind, arg: str, state: Phase) -> list[str]:
+    id = parse_item(arg)
     stuff = QueryStuff(limit=1, offset=id-1).execute(mind)
     if len(stuff) == 1:
         update_state(stuff[0], mind, state)
@@ -494,14 +491,15 @@ class Command(NamedTuple):
     help: str
 
 
-def add_command(sub_parsers, name, help, nargs=1):
+def add_command(sub_parsers, name, help):
     command = sub_parsers.add_parser(name)
-    command.add_argument(name, type=str, nargs=nargs, help=help)
+    command.add_argument(name, type=str, help=help)
     return command
 
 
 def add_list_cmd(sub_parsers, name, help):
-    sub_parser = add_command(sub_parsers, name, help, nargs='?')
+    sub_parser = sub_parsers.add_parser(name)
+    sub_parser.add_argument(name, type=str, help=help, nargs='?')
     sub_parser.add_argument("-n", "--num", type=int, default=PAGE_SIZE,
                             help="How much stuff to list.")
     sub_parser.add_argument("-p", "--page", type=int, default=1,

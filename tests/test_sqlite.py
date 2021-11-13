@@ -65,7 +65,7 @@ class TestSQLite(unittest.TestCase):
             add_content(sesh, [to_tick])
             active_before = QueryStuff().execute(sesh)
             self.assertEqual(2, len(active_before))
-            ticked = do_state_change(sesh, ["1"], Phase.DONE)
+            ticked = do_state_change(sesh, "1", Phase.DONE)
             active_after = QueryStuff().execute(sesh)
             self.assertIn(to_tick, ticked[0])
             self.assertTrue(ticked[0].startswith("Done: "))
@@ -113,7 +113,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_forget_success(self):
         # Given
-        args = Namespace(forget=["1"])
+        args = Namespace(forget="1")
         with Mind(self.MEM, strict=True) as sesh:
             add_content(sesh, ["some content"])
             # When
@@ -125,7 +125,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_forget_when_empty(self):
         # Given
-        args = Namespace(forget=["1"])
+        args = Namespace(forget="1")
         with Mind(self.MEM, strict=True) as sesh:
             # When
             output = do_forget(sesh, args)
@@ -134,7 +134,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_forget_tag_indexed(self):
         # Given
-        args = Namespace(forget=["#tag.1"])
+        args = Namespace(forget="#tag.1")
         with Mind(self.MEM, strict=True) as sesh:
             # When
             with self.assertRaises(NotImplementedError):
@@ -142,7 +142,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_tick_multiple_args(self):
         # Given
-        args = Namespace(tick=["#tag.1", "wot"])
+        args = Namespace(tick="1,2,3")
         with Mind(self.MEM, strict=True) as sesh:
             # When
             with self.assertRaises(NotImplementedError):
@@ -150,7 +150,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_tick_empty_db(self):
         # Given
-        args = Namespace(tick=["1"])
+        args = Namespace(tick="1")
         with Mind(self.MEM, strict=True) as sesh:
             # When
             output = do_tick(sesh, args)
@@ -159,7 +159,7 @@ class TestSQLite(unittest.TestCase):
 
     def test_show_success(self):
         # Given
-        args = Namespace(show=["1"])
+        args = Namespace(show="1")
         with Mind(self.MEM, strict=True) as sesh:
             do_add(sesh, Namespace(text="hello #something"))
             # When

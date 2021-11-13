@@ -64,7 +64,7 @@ class TestInteg(unittest.TestCase):
         self.assertEqual(output[-2][:15], "  Latest tags: ")
         self.assertEqual(output[-1], "-" * 80)
 
-    def test_add__interactive(self):
+    def test_add_interactive(self):
         # Given
         argv = ["add"]
         test_input = "Some stuff here"

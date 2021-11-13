@@ -29,6 +29,8 @@ class TestSQLite(unittest.TestCase):
     def setUp(self) -> None:
         self.sesh = setup_context(self, Mind(self.MEM, strict=True))
         self.stdout = setup_context(self, redirect_stdout(io.StringIO()))
+        self.input = setup_context(self,
+                                   patch("builtins.input", return_value="y"))
 
     def test_get_db_inmem(self):
         # Given / When
@@ -69,8 +71,7 @@ class TestSQLite(unittest.TestCase):
         self.assertEqual(10, len(fetched))
         self.assertGreater(fetched[0][0], fetched[-1][0])
 
-    @patch("builtins.input", return_value="y")
-    def test_update_correct_entry(self, patched):
+    def test_update_correct_entry(self):
         # Given
         to_tick = "some more stuff!!"
         # When
@@ -121,8 +122,7 @@ class TestSQLite(unittest.TestCase):
         # Then
         self.assertEqual("  Hmm, couldn't find anything here.", output[2])
 
-    @patch("builtins.input", return_value="y")
-    def test_forget_success(self, patched):
+    def test_forget_success(self):
         # Given
         args = Namespace(forget="1")
         add_content(self.sesh, ["some content"])
@@ -133,8 +133,7 @@ class TestSQLite(unittest.TestCase):
         self.assertTrue(output[0].startswith("Hidden: "))
         self.assertTrue(output[0].endswith(" -> some content"))
 
-    @patch("builtins.input", return_value="y")
-    def test_forget_when_empty(self, patched):
+    def test_forget_when_empty(self):
         # Given
         args = Namespace(forget="1")
         # When
@@ -142,16 +141,14 @@ class TestSQLite(unittest.TestCase):
         # Then
         self.assertListEqual(["Stuff with ID 1 not found."], output)
 
-    @patch("builtins.input", return_value="y")
-    def test_forget_tag_indexed(self, patched):
+    def test_forget_tag_indexed(self):
         # Given
         args = Namespace(forget="#tag.1")
         # When
         with self.assertRaises(ValueError):
             do_forget(self.sesh, args)
 
-    @patch("builtins.input", return_value="y")
-    def test_tick_multiple_args(self, patched):
+    def test_tick_multiple_args(self):
         # Given
         args = Namespace(tick="1,2,3")
         # When
@@ -185,8 +182,7 @@ class TestSQLite(unittest.TestCase):
         self.assertEqual(output[2], "Tags [something]")
         self.assertEqual(output[4], "hello")
 
-    @patch("builtins.input", return_value="y")
-    def test_filtered_list(self, patched):
+    def test_filtered_list(self):
         # Given
         sep = ":::"
         original_entries = 30

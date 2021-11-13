@@ -61,12 +61,12 @@ class TestInteg(unittest.TestCase):
         self.assertEqual(output[0],
                          " # Currently minding [latest] [ALL] [num=9]...")
         self.assertEqual(output[-3], "-" * 80)
-        self.assertEqual(output[-2][:15], "  Latest tags: ")
+        self.assertEqual(output[-2][:14], "  Latest tags:")
         self.assertEqual(output[-1], "-" * 80)
 
     def test_add_interactive(self):
         # Given
-        argv = ["add"]
+        argv = ["--db", self.MEM, "add"]
         test_input = "Some stuff here"
         with patch("builtins.input", return_value=test_input):
             # When

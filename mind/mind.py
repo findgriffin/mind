@@ -263,11 +263,8 @@ class Mind():
             raise IntegrityError(f"Unknown error {exc}")
 
 
-def parse_item(arg: str) -> int:
-    if arg.isdigit():
-        return int(arg)
-    else:
-        raise NotImplementedError("Only numbered items currently supported.")
+def parse_item(args: str) -> list[int]:
+    return [int(arg) for arg in args.split(',')]
 
 
 class QueryStuff(NamedTuple):
@@ -287,9 +284,13 @@ class QueryStuff(NamedTuple):
                f"WHERE stuff.state = :state {join2} " \
                f"ORDER BY stuff.id {self.order()} LIMIT :limit OFFSET :offset"
 
-    def execute(self, mind: Mind) -> list[Stuff]:
+    def fetchall(self, mind: Mind) -> list[Stuff]:
         cur = mind.query(self.cmd(), self._asdict())
         return [Stuff(*row) for row in cur.fetchall()]
+
+    def fetchone(self, mind: Mind) -> Optional[Stuff]:
+        row = mind.query(self.cmd(), self._asdict()).fetchone()
+        return Stuff(*row) if row else None
 
 
 class QueryTags(NamedTuple):
@@ -384,7 +385,7 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
     fetched = QueryStuff(latest=latest,
                          tag=filter.val,
                          offset=offset,
-                         limit=args.num+1).execute(mind)
+                         limit=args.num+1).fetchall(mind)
     noun = "latest" if latest else "oldest"
     output = [f" # Currently minding [{noun}] [{filter}] "
               f"[num={args.num}]...", H_RULE]
@@ -401,7 +402,7 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
     return output + [H_RULE] + wrapped + [H_RULE]
 
 
-def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> None:
+def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> str:
     change = Change(mind.head(), old_stuff,
                     Transition((old_stuff.state, new_state)), Epoch.now(), [])
     logging.debug(f"Canonical update: {change.canonical()}")
@@ -410,36 +411,61 @@ def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> None:
                              {"id": old_stuff.id, "state": new_state}),
                             (insert("log", rcd), rcd._asdict())]
     mind.tx(ops)
+    return f"{new_state.name.capitalize()}: {old_stuff}"
 
 
-def do_state_change(mind: Mind, arg: str, state: Phase) -> list[str]:
-    id = parse_item(arg)
-    stuff = QueryStuff(limit=1, offset=id-1).execute(mind)
-    if len(stuff) == 1:
-        update_state(stuff[0], mind, state)
-        return [f"{state.name.capitalize()}: {stuff[0]}"]
-    elif len(stuff) == 0:
-        return([f"Unable to find stuff: [{id}]"])
+def find_by_ids(mind: Mind, id_arg: str) -> tuple[list[Stuff], list[str]]:
+    found: list[Stuff] = []
+    not_found: list[str] = []
+    for id in parse_item(id_arg):
+        stuff = QueryStuff(limit=1, offset=id-1).fetchone(mind)
+        fail_msg = f"Stuff with ID {id} not found."
+        found.append(stuff) if stuff else not_found.append(fail_msg)
+    return found, not_found
+
+
+def prepare_change(mind: Mind, id_arg: str,
+                   action, check=True) -> tuple[list[Stuff], list[str]]:
+    found, not_found = find_by_ids(mind, id_arg)
+    if not_found:
+        return [], not_found
     else:
-        raise RuntimeError(f"Query for 1 row returned {len(stuff)} rows.")
+        print(f"Confirm that you want to {action} the following items:")
+        for item in found:
+            print(str(item))
+        answer = input("Answer 'y' or 'yes' to continue: ")
+        if answer.lower() in ["y", "yes"]:
+            return found, not_found
+        else:
+            return [], [f"Ok, will not {action} anything."]
 
 
 def do_forget(mind: Mind, args: argparse.Namespace) -> list[str]:
-    return do_state_change(mind, args.forget, Phase.HIDDEN)
+    changes, not_found = prepare_change(mind, args.forget, "forget")
+    if changes:
+        return [update_state(stuff, mind, Phase.HIDDEN) for stuff in changes]
+    else:
+        return not_found
 
 
 def do_tick(mind: Mind, args: argparse.Namespace) -> list[str]:
-    return do_state_change(mind, args.tick, Phase.DONE)
+    changes, not_found = prepare_change(mind, args.tick, "tick")
+    if changes:
+        return [update_state(stuff, mind, Phase.DONE) for stuff in changes]
+    else:
+        return not_found
 
 
 def do_show(mind: Mind, args: argparse.Namespace) -> list[str]:
-    id = parse_item(args.show)
-    rows = QueryStuff(limit=1, offset=id-1).execute(mind)
-    any(map(lambda r: logging.debug(f"Returned row: {r.__repr__()}"), rows))
-    if rows:
-        return rows[0].show(QueryTags(id=rows[0].id).execute(mind))
-    else:
-        return [f"Stuff [{id}] not found."]
+    output = []
+    for id in parse_item(args.show):
+        rows = QueryStuff(limit=1, offset=id-1).fetchall(mind)
+        any(map(lambda r: logging.debug(f"Returned: {r.__repr__()}"), rows))
+        if rows:
+            output.extend(rows[0].show(QueryTags(id=rows[0].id).execute(mind)))
+        else:
+            output.extend(f"Stuff [{id}] not found.")
+    return output
 
 
 def hist_row(row: tuple[int, str, Epoch, Epoch, Phase, Phase, str,

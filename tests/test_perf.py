@@ -8,6 +8,8 @@ import os
 import unittest
 from unittest import skip
 
+from unittest.mock import patch
+
 from mind import mind
 
 
@@ -85,8 +87,9 @@ class TestPerf(unittest.TestCase):
                     mind.do_tick(
                         sesh, Namespace(tick=[str(randint(1, int(i/2)))]))
                 elif i > 10:
-                    mind.do_forget(
-                        sesh, Namespace(forget=[str(randint(1, int(i/2)))]))
+                    id = str(randint(1, int(i/2)))
+                    with patch("builtins.input", return_value='y'):
+                        mind.do_forget(sesh, Namespace(forget=[id]))
         finish = datetime.now()
 
         # Then

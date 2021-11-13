@@ -81,7 +81,7 @@ class TestInteg(unittest.TestCase):
                 # When
                 with self.assertRaises(mind.IntegrityError):
                     with mind.Mind(path, strict=True) as sesh:
-                        mind.QueryStuff().execute(sesh)
+                        mind.QueryStuff().fetchall(sesh)
 
     def test_latest_schema(self):
         # Given

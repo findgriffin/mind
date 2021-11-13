@@ -6,8 +6,9 @@ import random
 import string
 import unittest
 
+from unittest.mock import patch
 
-from mind.mind import Mind, QueryStuff, add_content, do_state_change, Phase, \
+from mind.mind import Mind, QueryStuff, add_content, \
     QueryTags, do_list, do_forget, do_tick, do_add, do_show
 
 
@@ -35,7 +36,7 @@ class TestSQLite(unittest.TestCase):
         # Given
         with Mind(self.MEM, strict=True) as sesh:
             add_content(sesh, ["one"])
-            fetched = QueryStuff().execute(sesh)
+            fetched = QueryStuff().fetchall(sesh)
             # Then
             self.assertEqual(fetched[0][1], "one")
             now = datetime.utcnow().timestamp()
@@ -52,7 +53,7 @@ class TestSQLite(unittest.TestCase):
                 sleep(0.03)
                 add_content(sesh, [f"entry {i}"])
             # Then
-            fetched = QueryStuff().execute(sesh)
+            fetched = QueryStuff().fetchall(sesh)
             self.assertEqual(10, len(fetched))
             self.assertGreater(fetched[0][0], fetched[-1][0])
 
@@ -63,10 +64,11 @@ class TestSQLite(unittest.TestCase):
         with Mind(self.MEM, strict=True) as sesh:
             add_content(sesh, ["some stuff!!"])
             add_content(sesh, [to_tick])
-            active_before = QueryStuff().execute(sesh)
+            active_before = QueryStuff().fetchall(sesh)
             self.assertEqual(2, len(active_before))
-            ticked = do_state_change(sesh, "1", Phase.DONE)
-            active_after = QueryStuff().execute(sesh)
+            with patch("builtins.input", return_value="y"):
+                ticked = do_tick(sesh, Namespace(tick="1"))
+            active_after = QueryStuff().fetchall(sesh)
             self.assertIn(to_tick, ticked[0])
             self.assertTrue(ticked[0].startswith("Done: "))
             self.assertEqual(len(ticked), 1)
@@ -117,7 +119,8 @@ class TestSQLite(unittest.TestCase):
         with Mind(self.MEM, strict=True) as sesh:
             add_content(sesh, ["some content"])
             # When
-            output = do_forget(sesh, args)
+            with patch("builtins.input", return_value="y"):
+                output = do_forget(sesh, args)
             # Then
             self.assertEqual(1, len(output))
             self.assertTrue(output[0].startswith("Hidden: "))
@@ -128,25 +131,35 @@ class TestSQLite(unittest.TestCase):
         args = Namespace(forget="1")
         with Mind(self.MEM, strict=True) as sesh:
             # When
-            output = do_forget(sesh, args)
+            with patch("builtins.input", return_value="y"):
+                output = do_forget(sesh, args)
             # Then
-            self.assertListEqual(["Unable to find stuff: [1]"], output)
+            self.assertListEqual(["Stuff with ID 1 not found."], output)
 
     def test_forget_tag_indexed(self):
         # Given
         args = Namespace(forget="#tag.1")
         with Mind(self.MEM, strict=True) as sesh:
             # When
-            with self.assertRaises(NotImplementedError):
-                do_forget(sesh, args)
+            with self.assertRaises(ValueError):
+                with patch("builtins.input", return_value="y"):
+                    do_forget(sesh, args)
 
     def test_tick_multiple_args(self):
         # Given
         args = Namespace(tick="1,2,3")
         with Mind(self.MEM, strict=True) as sesh:
             # When
-            with self.assertRaises(NotImplementedError):
-                do_tick(sesh, args)
+            do_add(sesh, Namespace(text="one"))
+            do_add(sesh, Namespace(text="two"))
+            do_add(sesh, Namespace(text="three"))
+            with patch("builtins.input", return_value="y"):
+                ticked = do_tick(sesh, args)
+
+            # Then
+            listed = do_list(sesh, Namespace(num=10, page=1))
+            self.assertEqual(len(ticked), 3)
+            self.assertIn("  Hmm, couldn't find anything here.", listed)
 
     def test_tick_empty_db(self):
         # Given
@@ -155,7 +168,7 @@ class TestSQLite(unittest.TestCase):
             # When
             output = do_tick(sesh, args)
             # Then
-            self.assertListEqual(["Unable to find stuff: [1]"], output)
+            self.assertListEqual(["Stuff with ID 1 not found."], output)
 
     def test_show_success(self):
         # Given
@@ -179,8 +192,10 @@ class TestSQLite(unittest.TestCase):
                 do_add(sesh, Namespace(text=f"Entry{sep}{i+1} #{i % 2}"))
             excluded = []
             for i in range(4):
-                excluded.append(do_tick(sesh, Namespace(tick=f"{2}"))[0])
-                excluded.append(do_forget(sesh, Namespace(forget=f"{2}"))[0])
+                with patch("builtins.input", return_value="y"):
+                    excluded.append(do_tick(sesh, Namespace(tick=f"{2}"))[0])
+                    excluded.append(do_forget(sesh,
+                                              Namespace(forget=f"{2}"))[0])
             # When
             tag_0 = do_list(sesh, Namespace(list="0", num=10, page=1))
             tag_1 = do_list(sesh, Namespace(list="1", num=10, page=1))

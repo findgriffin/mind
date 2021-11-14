@@ -9,7 +9,7 @@ class TestTagging(unittest.TestCase):
         # Given
         tags = [mind.Tag(1, "one"), mind.Tag(1, "two")]
         # When
-        output = mind.canonical_tags(tags)
+        output = mind.Tag.canonical(tags)
         # Then
         self.assertEqual("Tags [one, two]", output)
 

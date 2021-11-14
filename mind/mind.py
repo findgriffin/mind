@@ -128,9 +128,9 @@ class Tag(NamedTuple):
     def constraints(self) -> list[str]:
         return []
 
-
-def canonical_tags(tags: list[Tag]) -> str:
-    return "Tags [{}]".format(", ".join([t.tag for t in tags]))
+    @classmethod
+    def canonical(cls, tags: list['Tag']) -> str:
+        return "Tags [{}]".format(", ".join([t.tag for t in tags]))
 
 
 class Stuff(NamedTuple):
@@ -147,7 +147,7 @@ class Stuff(NamedTuple):
                        placeholder=" ...") if self.body else "EMPTY"
 
     def show(self, tags: list[Tag] = []) -> list[str]:
-        return [f"Stuff [{self.id}]", H_RULE, canonical_tags(tags),
+        return [f"Stuff [{self.id}]", H_RULE, Tag.canonical(tags),
                 H_RULE, self.body]
 
     def canonical(self, phase: Phase = None):
@@ -177,7 +177,7 @@ class Change(NamedTuple):
 
     def canonical(self) -> str:
         parts = [self.parent.canonical(), self.stuff.canonical(
-            self.act.value[1]), repr(self.act), canonical_tags(self.tags)]
+            self.act.value[1]), repr(self.act), Tag.canonical(self.tags)]
         return "Change [{}]".format(",".join(parts))
 
     def hash(self) -> str:
@@ -499,7 +499,7 @@ def add_content(mind: Mind, content: list[str], state: Phase = Phase.ACTIVE,
     ops.insert(0, (insert(STUFF, stuff), stuff._asdict()))
     ops.append((insert("log", record), record._asdict()))
     mind.tx(ops)
-    return [f"Added {stuff} {canonical_tags(tags)}"]
+    return [f"Added {stuff} {Tag.canonical(tags)}"]
 
 
 def do_add(mind: Mind, args: argparse.Namespace) -> list[str]:

@@ -205,7 +205,7 @@ class Mind():
                 for name, schema in self.tables.items():
                     con.execute(build_create_table_cmd(name, schema))
                 add_content(self, [""], state=Phase.HIDDEN, parent=Record())
-        self.verify()
+        self.verify() if self.strict else self.verify(10)
 
     def __enter__(self):
         return self
@@ -252,10 +252,11 @@ class Mind():
                                  f"Computed: {computed}")
         return parent
 
-    def verify(self) -> None:
+    def verify(self, depth: Optional[int] = None) -> None:
         try:
-            parent = self.head()
-            while parent:
+            head = parent = self.head()
+            stop = max(head.sn - depth if depth else 1, 1)
+            for i in range(head.sn, stop, -1):
                 parent = self._verify(parent)
         except IntegrityError as err:
             raise err

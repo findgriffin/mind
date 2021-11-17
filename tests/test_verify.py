@@ -1,23 +1,19 @@
+from argparse import Namespace
 from contextlib import redirect_stdout
-
-import io
-
+from io import StringIO
+from unittest import skip, TestCase
 from unittest.mock import patch
 
-from unittest import skip
-
+from mind.mind import Mind, add_content, IntegrityError, do_forget
 from tests import setup_context
-import unittest
-
-from mind.mind import Mind, add_content, IntegrityError
 
 
-class TestVerify(unittest.TestCase):
+class TestVerify(TestCase):
     MEM = ":memory:"
 
     def setUp(self) -> None:
         self.sesh = setup_context(self, Mind(self.MEM, strict=False))
-        self.stdout = setup_context(self, redirect_stdout(io.StringIO()))
+        self.stdout = setup_context(self, redirect_stdout(StringIO()))
         self.input = setup_context(self,
                                    patch("builtins.input", return_value="y"))
 
@@ -51,7 +47,7 @@ class TestVerify(unittest.TestCase):
         with self.assertRaises(IntegrityError):
             self.sesh.verify()
 
-    @skip  # TODO: This test should raise an IntegrityError.
+    @skip("Incorrect state should be detected.")
     def test_verify_bad_state(self):
         # Given
         for i in range(100):
@@ -61,6 +57,15 @@ class TestVerify(unittest.TestCase):
         # When
         with self.assertRaises(IntegrityError):
             self.sesh.verify()
+
+    @skip("Incorrect state should be detected.")
+    def test_verify_bad_updated_state(self):
+        for i in range(10):
+            add_content(self.sesh, [f"hello {i}"])
+        add_content(self.sesh, ["test"])
+        do_forget(self.sesh, Namespace(forget="1"))
+        self.sesh.con.execute("UPDATE stuff SET state=:state",
+                              {"state": 1, "orig": "test"})
 
     def test_verify_bad_tag(self):
         # Given

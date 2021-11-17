@@ -176,6 +176,14 @@ class TestSQLite(unittest.TestCase):
         self.assertEqual(output[2], "Tags [something]")
         self.assertEqual(output[4], "hello")
 
+    def test_show_failure(self):
+        # Given
+        args = Namespace(show="1")
+        # When
+        output = do_show(self.sesh, args)
+        # Then
+        self.assertListEqual(output, ["Stuff [1] not found."])
+
     def test_filtered_list(self):
         # Given
         sep = ":::"

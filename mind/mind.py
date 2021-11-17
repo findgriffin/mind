@@ -460,7 +460,7 @@ def do_show(mind: Mind, args: argparse.Namespace) -> list[str]:
         if rows:
             output.extend(rows[0].show(QueryTags(id=rows[0].id).execute(mind)))
         else:
-            output.extend(f"Stuff [{id}] not found.")
+            output.append(f"Stuff [{id}] not found.")
     return output
 
 

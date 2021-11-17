@@ -207,8 +207,7 @@ class Mind():
         return self
 
     def __exit__(self, *exc_details):
-        if self.strict:
-            self.verify()
+        self.verify() if self.strict else self.verify(3)
         self.con.close()
 
     def query(self, sql: str, params: Params) -> Cursor:

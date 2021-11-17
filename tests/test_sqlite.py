@@ -171,10 +171,11 @@ class TestSQLite(unittest.TestCase):
         # When
         output = do_show(self.sesh, args)
         # Then
-        self.assertEqual(len(output), 5)
-        self.assertTrue("Stuff" in output[0])
-        self.assertEqual(output[2], "Tags [something]")
-        self.assertEqual(output[4], "hello")
+        self.assertEqual(len(output), 3)
+        self.assertTrue(output[0].startswith("[Created "))
+        self.assertTrue(output[0].endswith("Tags [something]"))
+        self.assertEqual(output[1], "hello")
+        self.assertEqual(output[2], "-" * 40)
 
     def test_show_failure(self):
         # Given

@@ -147,8 +147,8 @@ class Stuff(NamedTuple):
                        placeholder=" ...") if self.body else "EMPTY"
 
     def show(self, tags: list[Tag] = []) -> list[str]:
-        return [f"Stuff [{self.id}]", H_RULE, Tag.canonical(tags),
-                H_RULE, self.body]
+        return [f"[Created {self.id}] {Tag.canonical(tags)}",
+                self.body, "-" * 40]
 
     def canonical(self, phase: Phase = None):
         if not phase:

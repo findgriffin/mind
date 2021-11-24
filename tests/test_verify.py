@@ -1,10 +1,12 @@
 from argparse import Namespace
 from contextlib import redirect_stdout
 from io import StringIO
+from random import choice
+from timeit import Timer
 from unittest import skip, TestCase
 from unittest.mock import patch
 
-from mind.mind import Mind, add_content, IntegrityError, do_forget
+from mind.mind import Mind, add_content, IntegrityError, do_forget, do_tick
 from tests import setup_context
 
 
@@ -86,3 +88,13 @@ class TestVerify(TestCase):
         # When
         with self.assertRaises(IntegrityError):
             self.sesh.verify()
+
+    def test_verify_many(self):
+        for i in range(1000):
+            add_content(self.sesh, [f"hello{i} #tag{i} #tagtwo{i} #t{i}"])
+            if choice((True, False)):
+                do_forget(self.sesh, Namespace(forget=str(i)))
+            else:
+                do_tick(self.sesh, Namespace(tick=str(i)))
+
+        self.assertLessEqual(Timer(self.sesh.verify).timeit(10), 2)

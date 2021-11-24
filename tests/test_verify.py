@@ -97,4 +97,4 @@ class TestVerify(TestCase):
             else:
                 do_tick(self.sesh, Namespace(tick=str(i)))
 
-        self.assertLessEqual(Timer(self.sesh.verify).timeit(10), 2)
+        self.assertLessEqual(Timer(self.sesh.verify).timeit(10), 4)

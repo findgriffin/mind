@@ -130,7 +130,7 @@ class Tag(NamedTuple):
 
     @classmethod
     def canonical(cls, tags: list['Tag']) -> str:
-        return "Tags [{}]".format(", ".join([t.tag for t in tags]))
+        return "Tags [{}]".format(", ".join([t.tag for t in sorted(tags)]))
 
 
 class Stuff(NamedTuple):

@@ -15,6 +15,9 @@ test:
 	coverage html
 	coverage report --fail-under=90
 
+perf:
+	python -m unittest tests.perf.test_fs_perf.TestFsPerf
+
 deploy:	build git-clean
 	git push
 	

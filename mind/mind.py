@@ -220,22 +220,31 @@ class Mind():
             logging.debug("Entered transaction.")
             [self.query(*op) for op in operations]
 
-    def get_record(self, sn):
+    def get_record(self, sn) -> Record:
         cmd = "SELECT * FROM log WHERE sn = ?"
         row = self.query(cmd, (sn,)).fetchone()
         return Record(*row) if row else Record()
+
+    def get_full_record(self, sn) -> tuple[Record, Stuff, list[Tag]]:
+        row = self.query("SELECT log.*, stuff.*, group_concat(tags.tag) "
+                         "FROM log INNER JOIN stuff ON log.stuff = stuff.id "
+                         "LEFT JOIN tags ON stuff.id = tags.id "
+                         "WHERE log.sn = :sn",
+                         {"sn": sn}).fetchone()
+        stuff = Stuff(*row[6:9])
+        tags = [Tag(stuff.id, t) for t in row[9].split(",")] if row[9] else []
+        return (Record(*row[:6]), stuff, tags)
 
     def head(self) -> Record:
         cmd = "SELECT * FROM log ORDER BY sn DESC LIMIT 1"
         return Record(*self.query(cmd, ()).fetchone())
 
-    def _verify(self, record: Record) -> Record:
-        cur = self.query("SELECT * FROM stuff WHERE id=?", (record.stuff, ))
-        stuff = Stuff(*cur.fetchone())
+    def _verify(self, record: Record, stuff: Stuff,
+                tags: list[Tag]) -> tuple[Record, Stuff, list[Tag]]:
         logging.debug(f"Verifying {record}, {stuff}")
         is_active = record.new_state == Phase.ACTIVE
-        tags = QueryTags(id=stuff.id).execute(self) if is_active else []
-        parent = self.get_record(record.parent())
+        tags = tags if is_active else []
+        parent, p_stuff, p_tags = self.get_full_record(record.parent())
         change = Change(parent, stuff, record.act(), record.stamp, tags)
         calc_hash = change.hash()
         computed = f"Computed: {calc_hash} <- {change.canonical()}"
@@ -245,14 +254,15 @@ class Mind():
         else:
             raise IntegrityError(f"Hash mismatch\nRetrieved: {record}\n"
                                  f"Computed: {computed}")
-        return parent
+        return parent, p_stuff, p_tags
 
     def verify(self, depth: Optional[int] = None) -> None:
         try:
-            head = parent = self.head()
+            head = self.head()
             stop = max(head.sn - depth if depth else 1, 1)
+            record, stuff, tags = self.get_full_record(head.sn)
             for i in range(head.sn, stop, -1):
-                parent = self._verify(parent)
+                record, stuff, tags = self._verify(record, stuff, tags)
         except IntegrityError as err:
             raise err
         except Exception as exc:

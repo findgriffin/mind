@@ -68,6 +68,9 @@ class TestVerify(TestCase):
         do_forget(self.sesh, Namespace(forget="1"))
         self.sesh.con.execute("UPDATE stuff SET state=:state",
                               {"state": 1, "orig": "test"})
+        # When / Then
+        with self.assertRaises(IntegrityError):
+            self.sesh.verify()
 
     def test_verify_bad_tag(self):
         # Given

@@ -11,12 +11,12 @@ types:
 	mypy mind
 
 test:
-	coverage run --source mind -m unittest discover
+	coverage run --source mind -m unittest discover -s tests/unit
 	coverage html
 	coverage report --fail-under=90
 
 perf:
-	python -m unittest tests.perf.test_fs_perf.TestFsPerf
+	python -m unittest discover -s tests/perf
 
 deploy:	build git-clean
 	git push

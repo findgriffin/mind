@@ -24,7 +24,6 @@ class TestFsPerf(TestCase):
         self.input = setup_context(self,
                                    patch("builtins.input", return_value="y"))
 
-    @skip
     def test_big_db(self):
         # Given
         MAX = 10*365*10

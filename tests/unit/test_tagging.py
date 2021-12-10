@@ -1,15 +1,16 @@
 import unittest
 
 from mind import mind
+from mind.mind import Tags
 
 
 class TestTagging(unittest.TestCase):
 
-    def test_tag_set(self):
+    def test_tag_set_alphabetical(self):
         # Given
-        tags = [mind.Tag(1, "one"), mind.Tag(1, "two")]
+        tags = Tags([mind.Tag(1, "two"), mind.Tag(1, "one")])
         # When
-        output = mind.Tag.canonical(tags)
+        output = tags.canonical()
         # Then
         self.assertEqual("Tags [one, two]", output)
 

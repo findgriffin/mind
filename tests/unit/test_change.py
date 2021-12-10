@@ -1,7 +1,7 @@
 import unittest
 
 from mind.mind import Change, Record, Stuff, Phase, \
-    Sequence, Tag, Epoch, Transition
+    Sequence, Tag, Epoch, Transition, Tags
 
 E1 = Epoch(1)
 E2 = Epoch(2)
@@ -15,7 +15,7 @@ class TestChange(unittest.TestCase):
         record = Record()
         stuff = Stuff(Epoch(946684800), "", state=Phase.HIDDEN)
         # When
-        canon = Change(record, stuff, Transition.INIT, E1, []).canonical()
+        canon = Change(record, stuff, Transition.INIT, E1, Tags()).canonical()
         # Then
         self.assertEqual(canon, "Change [Record [0,],Stuff [386d4380,],"
                                 "Phases [ABSENT->HIDDEN],Tags []]")
@@ -24,7 +24,7 @@ class TestChange(unittest.TestCase):
         # Given
         stuff = Stuff(Epoch(15), "some body", state=Phase.ACTIVE)
         # When
-        canon = Change(PARENT, stuff, Transition.ADD, E2, []).canonical()
+        canon = Change(PARENT, stuff, Transition.ADD, E2, Tags()).canonical()
         # Then
         self.assertEqual(canon, "Change [Record [30,hash],Stuff [f,"
                                 "some body],Phases [ABSENT->ACTIVE],Tags []]")
@@ -32,7 +32,7 @@ class TestChange(unittest.TestCase):
     def test_add_with_tag(self):
         # Given
         stuff = Stuff(Epoch(15), "some body", state=Phase.ACTIVE)
-        tags = [Tag(1, "1"), Tag(1, "2")]
+        tags = Tags((Tag(1, "1"), Tag(1, "2")))
         # When
         change = Change(PARENT, stuff, Transition.ADD, E2, tags)
         # Then
@@ -45,7 +45,7 @@ class TestChange(unittest.TestCase):
         stuff = Stuff(Epoch(15), "some body", state=Phase.DONE)
         # When
         canon = Change(PARENT, stuff, Transition.TICK,
-                       Epoch(11), []).canonical()
+                       Epoch(11), Tags()).canonical()
         # Then
         self.assertEqual(canon, "Change [Record [30,hash],Stuff [f,"
                                 "],Phases [ACTIVE->DONE],Tags []]")

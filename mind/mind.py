@@ -128,9 +128,11 @@ class Tag(NamedTuple):
     def constraints(self) -> list[str]:
         return []
 
-    @classmethod
-    def canonical(cls, tags: list['Tag']) -> str:
-        return "Tags [{}]".format(", ".join([t.tag for t in sorted(tags)]))
+
+class Tags(list[Tag]):
+
+    def canonical(self) -> str:
+        return "Tags [{}]".format(", ".join([t.tag for t in sorted(self)]))
 
 
 class Stuff(NamedTuple):
@@ -146,8 +148,8 @@ class Stuff(NamedTuple):
         return shorten(self.body.splitlines()[0], width=width,
                        placeholder=" ...") if self.body else "EMPTY"
 
-    def show(self, tags: list[Tag] = []) -> list[str]:
-        return [f"[Created {self.id}] {Tag.canonical(tags)}",
+    def show(self, tags: Tags = Tags()) -> list[str]:
+        return [f"[Created {self.id}] {tags.canonical()}",
                 self.body, "-" * 40]
 
     def canonical(self, phase: Phase = None):
@@ -171,11 +173,11 @@ class Change(NamedTuple):
     stuff: Stuff
     act: Transition
     stamp: Epoch
-    tags: list[Tag]
+    tags: Tags = Tags()
 
     def canonical(self) -> str:
         parts = [self.parent.canonical(), self.stuff.canonical(
-            self.act.value[1]), repr(self.act), Tag.canonical(self.tags)]
+            self.act.value[1]), repr(self.act), self.tags.canonical()]
         return "Change [{}]".format(",".join(parts))
 
     def hash(self) -> str:
@@ -225,14 +227,17 @@ class Mind():
         row = self.query(cmd, (sn,)).fetchone()
         return Record(*row) if row else Record()
 
-    def get_full_record(self, sn) -> tuple[Record, Stuff, list[Tag]]:
+    def get_full_record(self, sn) -> tuple[Record, Stuff, Tags]:
         row = self.query("SELECT log.*, stuff.*, group_concat(tags.tag) "
                          "FROM log INNER JOIN stuff ON log.stuff = stuff.id "
                          "LEFT JOIN tags ON stuff.id = tags.id "
                          "WHERE log.sn = :sn",
                          {"sn": sn}).fetchone()
         stuff = Stuff(*row[6:9])
-        tags = [Tag(stuff.id, t) for t in row[9].split(",")] if row[9] else []
+        if row[9]:
+            tags = Tags([Tag(stuff.id, t) for t in row[9].split(",")])
+        else:
+            tags = Tags()
         return (Record(*row[:6]), stuff, tags)
 
     def head(self) -> Record:
@@ -240,10 +245,10 @@ class Mind():
         return Record(*self.query(cmd, ()).fetchone())
 
     def _verify(self, record: Record, stuff: Stuff,
-                tags: list[Tag]) -> tuple[Record, Stuff, list[Tag]]:
+                tags: Tags) -> tuple[Record, Stuff, Tags]:
         logging.debug(f"Verifying {record}, {stuff}")
         is_active = record.new_state == Phase.ACTIVE
-        tags = tags if is_active else []
+        tags = tags if is_active else Tags()
         parent, p_stuff, p_tags = self.get_full_record(record.parent())
         change = Change(parent, stuff, record.act(), record.stamp, tags)
         calc_hash = change.hash()
@@ -310,9 +315,9 @@ class QueryTags(NamedTuple):
             return "SELECT MAX(id), tag FROM tags GROUP BY tag " \
                    "ORDER BY id DESC LIMIT :limit"
 
-    def execute(self, mind: Mind) -> list[Tag]:
+    def execute(self, mind: Mind) -> Tags:
         cur = mind.query(self.cmd(), self._asdict())
-        return [Tag(*row) for row in cur.fetchall()]
+        return Tags([Tag(*row) for row in cur.fetchall()])
 
 
 def build_create_table_cmd(table_name: str, schema) -> str:
@@ -331,7 +336,7 @@ def is_tag(word: str) -> Optional[str]:
     return None
 
 
-def extract_tags(raw_line: str):
+def extract_tags(raw_line: str) -> tuple[str, set[str]]:
     tags: set[str] = set()
     content: list[str] = []
     for word in raw_line.split():
@@ -341,7 +346,7 @@ def extract_tags(raw_line: str):
 
 
 def new_stuff(hunks: list[str], state: Phase,
-              joiner=NEWLINE) -> tuple[Stuff, list[Tag], Epoch]:
+              joiner=NEWLINE) -> tuple[Stuff, Tags, Epoch]:
     now = Epoch.now()
     cleaned: list[str] = []
     all_tags: set[str] = set()
@@ -349,7 +354,7 @@ def new_stuff(hunks: list[str], state: Phase,
         body, tags = extract_tags(hunk)
         all_tags = all_tags.union(tags)
         cleaned.append(body)
-    tag_set = [Tag(now, name) for name in sorted(all_tags)]
+    tag_set = Tags([Tag(now, name) for name in sorted(all_tags)])
     return Stuff(now, joiner.join(cleaned), state), tag_set, now
 
 
@@ -410,7 +415,7 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
 
 def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> str:
     change = Change(mind.head(), old_stuff,
-                    Transition((old_stuff.state, new_state)), Epoch.now(), [])
+                    Transition((old_stuff.state, new_state)), Epoch.now())
     logging.debug(f"Canonical update: {change.canonical()}")
     rcd = change.record()
     ops: list[Operation] = [("UPDATE stuff SET state=:state WHERE id=:id",
@@ -505,7 +510,7 @@ def add_content(mind: Mind, content: list[str], state: Phase = Phase.ACTIVE,
     ops.insert(0, (insert(STUFF, stuff), stuff._asdict()))
     ops.append((insert("log", record), record._asdict()))
     mind.tx(ops)
-    return [f"Added {stuff} {Tag.canonical(tags)}"]
+    return [f"Added {stuff} {tags.canonical()}"]
 
 
 def do_add(mind: Mind, args: argparse.Namespace) -> list[str]:

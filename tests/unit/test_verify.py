@@ -89,4 +89,3 @@ class TestVerify(TestCase):
         # When
         with self.assertRaises(IntegrityError):
             self.sesh.verify()
-

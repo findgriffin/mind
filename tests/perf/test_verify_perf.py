@@ -18,6 +18,7 @@ class TestVerifyPerf(TestCase):
         self.stdout = setup_context(self, redirect_stdout(StringIO()))
         self.input = setup_context(self,
                                    patch("builtins.input", return_value="y"))
+
     def test_verify_many(self):
         for i in range(1000):
             add_content(self.sesh, [f"hello{i} #tag{i} #tagtwo{i} #t{i}"])
@@ -26,4 +27,4 @@ class TestVerifyPerf(TestCase):
             else:
                 do_tick(self.sesh, Namespace(tick=str(i)))
 
-        self.assertLessEqual(Timer(self.sesh.verify).timeit(10), 2)
+        self.assertLessEqual(Timer(self.sesh.verify).timeit(10), 3)

@@ -3,7 +3,7 @@ from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
 from random import randint, random
-from unittest import skip, TestCase
+from unittest import TestCase
 from unittest.mock import patch
 import io
 import logging

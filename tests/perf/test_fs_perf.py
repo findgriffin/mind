@@ -1,14 +1,13 @@
 from argparse import Namespace
 from contextlib import redirect_stdout
-from datetime import datetime
+from io import StringIO
+from os import stat
 from pathlib import Path
 from random import randint, random
+from tempfile import NamedTemporaryFile
+from timeit import Timer
 from unittest import TestCase
 from unittest.mock import patch
-import io
-import logging
-import os
-import tempfile
 
 from mind import mind
 from tests import setup_context, line
@@ -17,35 +16,36 @@ from tests import setup_context, line
 class TestFsPerf(TestCase):
 
     def setUp(self):
-        tmp = tempfile.NamedTemporaryFile(suffix='.db')
+        tmp = NamedTemporaryFile(suffix='.db')
         self.tmp = setup_context(self, tmp)
         self.sesh = setup_context(self, mind.Mind(tmp.name, strict=True))
-        self.stdout = setup_context(self, redirect_stdout(io.StringIO()))
+        self.stdout = setup_context(self, redirect_stdout(StringIO()))
         self.input = setup_context(self,
                                    patch("builtins.input", return_value="y"))
 
+    def random_id(self) -> int:
+        return randint(1, max(int(self.sesh.head().sn/2), 2))
+
+    def do_iteration(self):
+        if random() < .7:
+            mind.add_content(self.sesh,
+                             content=[line(words=2, tags=1)])
+        elif random() < .9:
+            mind.do_tick(
+                self.sesh, Namespace(tick=str(self.random_id())))
+        else:
+            mind.do_forget(self.sesh, Namespace(forget=str(self.random_id())))
+
+    def test_medium_db(self):
+        # Given
+        iterations = 10*365
+        # When / Then
+        self.assertLessEqual(Timer(self.do_iteration).timeit(iterations), 5)
+        self.assertLess(stat(Path(self.tmp.name)).st_size / 1024, 500)
+
     def test_big_db(self):
         # Given
-        MAX = 10*365*10
-
-        # When
-        start = datetime.now()
-        for i in range(MAX):
-            logging.info(f"Iteration {i}")
-            if random() < .7:
-                mind.add_content(self.sesh,
-                                 content=[line(words=2, tags=1)])
-            elif random() < .9 and i > 10:
-                mind.do_tick(
-                    self.sesh, Namespace(tick=str(randint(1, int(i/2)))))
-            elif i > 10:
-                id = str(randint(1, int(i/2)))
-                mind.do_forget(self.sesh, Namespace(forget=id))
-        finish = datetime.now()
-
-        # Then
-        db_path = Path(self.tmp.name)
-
-        self.assertLess(os.stat(db_path).st_size / 1024, 6000)
-        print(f"DB size: {os.stat(db_path).st_size}")
-        self.assertLess((finish - start).seconds, 55)
+        iterations = 10*355*10
+        # When / Then
+        self.assertLessEqual(Timer(self.sesh.verify).timeit(iterations), 70)
+        self.assertLess(stat(Path(self.tmp.name)).st_size / 1024, 5_000)

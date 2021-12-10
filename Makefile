@@ -25,6 +25,9 @@ git-clean:
 	git diff-index --quiet HEAD
 	test -z "$(git status --porcelain)"
 
+branch:
+	git branch --show-current
+
 run:
 	./run.py
 

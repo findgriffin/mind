@@ -47,5 +47,5 @@ class TestFsPerf(TestCase):
         # Given
         iterations = 10*365*10
         # When / Then
-        self.assertLessEqual(Timer(self.do_iteration).timeit(iterations), 70)
+        self.assertLessEqual(Timer(self.do_iteration).timeit(iterations), 90)
         self.assertLess(stat(Path(self.tmp.name)).st_size / 1024, 5_000)

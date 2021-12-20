@@ -131,6 +131,11 @@ class Tag(NamedTuple):
 
 class Tags(list[Tag]):
 
+    @classmethod
+    def from_grouped(cls, id: Epoch, grouped: Optional[str]):
+        parts = grouped.split(",") if grouped else []
+        return Tags([Tag(id, t) for t in parts])
+
     def canonical(self) -> str:
         return "Tags [{}]".format(", ".join([t.tag for t in sorted(self)]))
 
@@ -229,11 +234,7 @@ class Mind():
                          "WHERE log.sn = :sn",
                          {"sn": sn}).fetchone()
         stuff = Stuff(*row[6:9])
-        if row[9]:
-            tags = Tags([Tag(stuff.id, t) for t in row[9].split(",")])
-        else:
-            tags = Tags()
-        return (Record(*row[:6]), stuff, tags)
+        return (Record(*row[:6]), stuff, Tags.from_grouped(stuff.id, row[9]))
 
     def head(self) -> Record:
         cmd = "SELECT * FROM log ORDER BY sn DESC LIMIT 1"

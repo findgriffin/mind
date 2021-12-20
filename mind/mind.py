@@ -222,11 +222,6 @@ class Mind():
             logging.debug("Entered transaction.")
             [self.query(*op) for op in operations]
 
-    def get_record(self, sn) -> Record:
-        cmd = "SELECT * FROM log WHERE sn = ?"
-        row = self.query(cmd, (sn,)).fetchone()
-        return Record(*row) if row else Record()
-
     def get_full_record(self, sn) -> tuple[Record, Stuff, Tags]:
         row = self.query("SELECT log.*, stuff.*, group_concat(tags.tag) "
                          "FROM log INNER JOIN stuff ON log.stuff = stuff.id "

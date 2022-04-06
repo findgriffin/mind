@@ -1,9 +1,20 @@
 
 build: style types test
 
-install:
+venv:
+	python3 -m venv venv
+
+venv/pip.log: requirements.txt
 	pip3 install -r requirements.txt
 
+install: venv venv/pip.log
+	echo "#! /bin/sh" > activate
+	echo ". ./venv/bin/activate" >> activate
+	chmod +x activate
+	./activate; \
+
+activate:
+	set -a && . ./venv/bin/activate && set +a
 style:
 	flake8 mind tests
 
@@ -32,5 +43,6 @@ run:
 	./run.py
 
 clean:
+	rm -rf venv
 	rm -rf **/__pycache__
 	rm -rf **/*.pyc

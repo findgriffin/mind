@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
-from mind import mind
+from mind import cli
 import sys
 
 if __name__ == "__main__":
-    for line in mind.main(sys.argv[1:]):
+    for line in cli.main(sys.argv[1:]):
         print(line)

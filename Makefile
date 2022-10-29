@@ -5,16 +5,17 @@ venv:
 	python3 -m venv venv
 
 venv/pip.log: requirements.txt
-	pip3 install -r requirements.txt
+	pip3 install -r requirements.txt > venv/pip.log
 
-install: venv venv/pip.log
-	echo "#! /bin/sh" > activate
-	echo ". ./venv/bin/activate" >> activate
-	chmod +x activate
-	./activate; \
+activate.sh:
+	echo "#! /bin/sh" > activate.sh
+	echo ". ./venv/bin/activate" >> activate.sh
+	chmod +x activate.sh
+	
+install: venv venv/pip.log activate.sh
 
 activate:
-	set -a && . ./venv/bin/activate && set +a
+	set -a && ./activate.sh && set +a
 style:
 	flake8 mind tests
 

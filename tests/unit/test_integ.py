@@ -7,7 +7,7 @@ import unittest
 
 from unittest.mock import patch
 
-from mind import mind
+from mind import cli, mind
 
 
 class TestInteg(unittest.TestCase):
@@ -29,7 +29,7 @@ class TestInteg(unittest.TestCase):
                          text=None, interactive=None,
                          file="tests/data/note.md")
         # When
-        output = mind.run(args)
+        output = cli.run(args)
         # Then
         self.assertEqual(1, len(output))
         self.assertTrue(output[0].startswith("Added "))
@@ -42,7 +42,7 @@ class TestInteg(unittest.TestCase):
         # When
         with redirect_stdout(io.StringIO()) as stdout_buffer:
             with self.assertRaises(SystemExit) as exit:
-                mind.setup(argv)
+                cli.setup(argv)
         stdout = stdout_buffer.getvalue()
 
         # Then
@@ -56,7 +56,7 @@ class TestInteg(unittest.TestCase):
         # Given
         argv = []
         # When
-        output = mind.main(argv)
+        output = cli.main(argv)
         # Then
         self.assertEqual(output[0],
                          " # Currently minding [latest] [ALL] [num=9]...")
@@ -70,7 +70,7 @@ class TestInteg(unittest.TestCase):
         test_input = "Some stuff here"
         with patch("builtins.input", return_value=test_input):
             # When
-            output = mind.main(argv)
+            output = cli.main(argv)
         # Then
         self.assertEqual(output[0][-27:], f" -> {test_input} Tags []")
 

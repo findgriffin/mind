@@ -2,7 +2,7 @@ import unittest
 from io import StringIO
 from unittest.mock import patch
 
-from mind import mind
+from mind import cli as mind
 
 
 class TestParser(unittest.TestCase):

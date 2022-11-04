@@ -25,16 +25,15 @@
     }
 
     body {
-        background: var(--gray);
+        background: var(--dark);
         margin: 0;
     }
 
     header {
         background: var(--dark);
-        color: var(--accent);
+        color: var(--light);
         letter-spacing: 0.2em;
-        margin: 0;
-        padding: 0.1rem 1rem;
+        margin: 0 1rem ;
     }
 
     article {
@@ -57,6 +56,10 @@
         display: flex;
         align-items: center;
     }
+    article > h4 {
+        color: var(--accent-dark);
+        letter-spacing: 0.05rem;
+    }
 
     /* TODO: https://codepen.io/kathykato/pen/xxGObEp */
     input[type=checkbox] {
@@ -65,7 +68,7 @@
         height: 1.5rem;
         color: var(--gray);
         /* border: 1px solid var(--accent); */
-        background: var(--accent);
+        background: var(--gray);
         border-radius: 4px;
         -webkit-appearance: none;
            -moz-appearance: none;

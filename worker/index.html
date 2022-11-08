@@ -1,0 +1,107 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TESTING CloudFlare Workers</title>
+  <script src="./worker.js"></script>
+  <script>
+    let SALT = null;
+    const NEW_USERS = {};
+
+    // From https://bitcoin.stackexchange.com/questions/52727/
+    // byte-array-to-hexadecimal-and-back-again-in-javascript
+    function toHexString(byteArray) {
+        return Array.prototype.map.call(byteArray, function(byte) {
+            return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+        }).join('');
+    }
+    function toByteArray(hexString) {
+        var result = [];
+        for (var i = 0; i < hexString.length; i += 2) {
+            result.push(parseInt(hexString.substr(i, 2), 16));
+        }
+        return result;
+    }
+    async function saltGen() {
+        let current = document.getElementById('salt');
+        if (current.value) {
+            console.log('Clear salt to generate a new one');
+        } else {
+            current.value = crypto.randomUUID();
+            SALT = current.value;
+        }
+        return false;
+    }
+
+    function updateUsers(newName, newHash) {
+        const settings = document.getElementById('settings');
+        NEW_USERS[newName] = newHash
+        txt = `salt: ${SALT}\n\n`
+        Object.entries(NEW_USERS).forEach(([k, v]) => txt += `${k}: ${v}\n`);
+
+        txt += 'Users JSON:\n'
+        txt += JSON.stringify(NEW_USERS);
+
+        if (SALT) {
+            settings.innerText = txt
+        } else {
+            console.log('Salt must not be empty.')
+        }
+    }
+
+    async function newUser() {
+        const password = document.getElementById('pass').value;
+        const name = document.getElementById('username').value;
+        const salt = document.getElementById('salt').value;
+        if (salt && name && password) {
+            const myDigest = await crypto.subtle.digest(
+                {name: 'SHA-256'}, new TextEncoder().encode(salt + password)
+            );
+            const hash = toHexString(new Uint8Array(myDigest))
+            console.log(`${name}: ${hash}`);
+            updateUsers(name, hash)
+        } else {
+            console.log('Need a salt, name, and password to add user.')
+        }
+    }
+
+  </script>
+</head>
+<body>
+<h2>Mind Setup</h2>
+<h3>Salt</h3>
+<form id="salt_form">
+  <input id="salt" type="text" style="width: 30em; font-family: monospace"
+         placeholder="Paste an existing salt here, or click generate..">
+  <input type="submit" value="Generate">
+</form>
+
+<h3>New user</h3>
+<form name="newuser" id="newuser">
+  <input id="username" placeholder="name" type="text">
+  <br>
+  <input id="pass" name="password" placeholder="password.." type="password">
+  <br>
+  <input type="submit" value="Create">
+</form>
+<h3>Settings</h3>
+<div id="settings" style="font-family: monospace"></div>
+
+<script>
+    var form = document.getElementById("newuser");
+    form.addEventListener("submit", function(evt) {
+        evt.preventDefault();
+        newUser();
+        return false;
+    });
+
+    var form = document.getElementById("salt_form");
+    form.addEventListener("submit", function(evt) {
+        evt.preventDefault();
+        saltGen();
+        return false;
+    });
+
+</script>
+</body>
+</html>

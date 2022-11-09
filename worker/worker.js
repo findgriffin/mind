@@ -5,6 +5,8 @@
  * Some browsers may show "Enter user name and password to access REALM"
  */
 
+// TODO: implement hex conversion https://stackoverflow.com/a/50868276/12376646
+
 // From https://bitcoin.stackexchange.com/questions/52727/
 // byte-array-to-hexadecimal-and-back-again-in-javascript
 function toHexString(byteArray) {
@@ -12,6 +14,9 @@ function toHexString(byteArray) {
     return ('0' + (byte & 0xFF).toString(16)).slice(-2);
   }).join('');
 }
+const toHexAlt = (bytes) =>
+    bytes.reduce((str, byte) => str + byte.toString(16).padStart(2, '0'), '');
+
 function toByteArray(hexString) {
   var result = [];
   for (var i = 0; i < hexString.length; i += 2) {
@@ -39,8 +44,14 @@ async function hasAuthCookie(request) {
   return cookies[AUTH] != null && cookies[AUTH] == EXPECTED;
 }
 
-function generateCookie() {
-  return "cookie"
+COOKIE_ALGO = {name: "HMAC"}
+
+async function generateCookie(key) {
+  const data = new Uint8Array(32);
+  crypto.getRandomValues(data);
+  const sig = await crypto.subtle.sign(COOKIE_ALGO, key, data);
+  const part2 = new Uint8Array(sig);
+  return `${toHexAlt(data)}.${toHexAlt(part2)}`;
 }
 
 async function loginUser(body_json) {

@@ -7,17 +7,25 @@
       // Put stuff here to simulate Workers env vars
     let SALT = '1234';
     const BASE = 'http://localhost:8000';
-    const USERS = {"foo":"abc1d8631d94a6e32b22cc39bb58d002181e9b6a29af0fbbda3089204328c80e"};
+    let KEY = null;
+    const USERS = {};
+    const LOGIN = {};
   </script>
   <script src="./worker.js"></script>
   <script>
 
+
+      function randomHex(len_bytes) {
+          const arr = new Uint8Array(len_bytes);
+          crypto.getRandomValues(arr);
+          return Array.from(arr).map(i => i.toString(16)).join('');
+      }
     async function saltGen() {
         let current = document.getElementById('salt');
         if (current.value) {
             console.log('Clear salt to generate a new one');
         } else {
-            current.value = crypto.randomUUID();
+            current.value = randomHex(16)
             SALT = current.value;
         }
         return false;
@@ -29,28 +37,32 @@
             console.log('Clear key to generate a new key.');
         } else {
             let key = await window.crypto.subtle.generateKey(
-                {name: "HMAC", hash: {name: "SHA-512"}},
+                {name: "HMAC", hash: {name: "SHA-256"}},
                 true, ["sign", "verify"]
             );
+            KEY = key;
             jwk = await window.crypto.subtle.exportKey('jwk', key);
             s_key.value = JSON.stringify(jwk);
         }
         return false;
     }
 
-    function updateUsers(newName, newHash) {
+    function updateUsers(newName, newId, newHash) {
         const settings = document.getElementById('settings');
-        USERS[newName] = newHash
-        txt = `salt: ${SALT}\n\n`
-        Object.entries(USERS).forEach(([k, v]) => txt += `${k}: ${v}\n`);
-
-        txt += 'Users JSON:\n'
-        txt += JSON.stringify(USERS);
-
-        if (SALT) {
-            settings.innerText = txt
+        if (newId in USERS) {
+            console.error('user ID collision!')
+        } else if (newName in LOGIN) {
+            console.error(`user ${newName} already exists!`)
         } else {
-            console.log('Salt must not be empty.')
+            USERS[newId] = newName;
+            LOGIN[newName] = newHash;
+            txt = `SALT\n${SALT}\n`
+
+            txt += 'USERS:\n'
+            txt += JSON.stringify(USERS);
+            txt += '\nLOGIN:\n'
+            txt += JSON.stringify(LOGIN);
+            settings.innerText = txt
         }
     }
 
@@ -58,10 +70,11 @@
         const password = document.getElementById('pass').value;
         const name = document.getElementById('username').value;
         const salt = document.getElementById('salt').value;
+        const id = randomHex(4);
         if (salt && name && password) {
             const hash = toHexString(await hashPassword(salt, password))
-            console.log(`${name}: ${hash}`);
-            updateUsers(name, hash)
+            console.log(`${id}: ${hash} (${name})`);
+            updateUsers(name, id, hash)
         } else {
             console.log('Need a salt, name, and password to add user.')
         }

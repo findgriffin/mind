@@ -3,25 +3,15 @@
 <head>
   <meta charset="utf-8">
   <title>TESTING CloudFlare Workers</title>
+  <script>
+      // Put stuff here to simulate Workers env vars
+    let SALT = '1234';
+    const BASE = 'http://localhost:8000';
+    const USERS = {"foo":"abc1d8631d94a6e32b22cc39bb58d002181e9b6a29af0fbbda3089204328c80e"};
+  </script>
   <script src="./worker.js"></script>
   <script>
-    let SALT = null;
-    const NEW_USERS = {};
 
-    // From https://bitcoin.stackexchange.com/questions/52727/
-    // byte-array-to-hexadecimal-and-back-again-in-javascript
-    function toHexString(byteArray) {
-        return Array.prototype.map.call(byteArray, function(byte) {
-            return ('0' + (byte & 0xFF).toString(16)).slice(-2);
-        }).join('');
-    }
-    function toByteArray(hexString) {
-        var result = [];
-        for (var i = 0; i < hexString.length; i += 2) {
-            result.push(parseInt(hexString.substr(i, 2), 16));
-        }
-        return result;
-    }
     async function saltGen() {
         let current = document.getElementById('salt');
         if (current.value) {
@@ -33,14 +23,29 @@
         return false;
     }
 
+    async function keyGen() {
+        let s_key = document.getElementById('signing');
+        if (s_key.value) {
+            console.log('Clear key to generate a new key.');
+        } else {
+            let key = await window.crypto.subtle.generateKey(
+                {name: "HMAC", hash: {name: "SHA-512"}},
+                true, ["sign", "verify"]
+            );
+            jwk = await window.crypto.subtle.exportKey('jwk', key);
+            s_key.value = JSON.stringify(jwk);
+        }
+        return false;
+    }
+
     function updateUsers(newName, newHash) {
         const settings = document.getElementById('settings');
-        NEW_USERS[newName] = newHash
+        USERS[newName] = newHash
         txt = `salt: ${SALT}\n\n`
-        Object.entries(NEW_USERS).forEach(([k, v]) => txt += `${k}: ${v}\n`);
+        Object.entries(USERS).forEach(([k, v]) => txt += `${k}: ${v}\n`);
 
         txt += 'Users JSON:\n'
-        txt += JSON.stringify(NEW_USERS);
+        txt += JSON.stringify(USERS);
 
         if (SALT) {
             settings.innerText = txt
@@ -54,17 +59,13 @@
         const name = document.getElementById('username').value;
         const salt = document.getElementById('salt').value;
         if (salt && name && password) {
-            const myDigest = await crypto.subtle.digest(
-                {name: 'SHA-256'}, new TextEncoder().encode(salt + password)
-            );
-            const hash = toHexString(new Uint8Array(myDigest))
+            const hash = toHexString(await hashPassword(salt, password))
             console.log(`${name}: ${hash}`);
             updateUsers(name, hash)
         } else {
             console.log('Need a salt, name, and password to add user.')
         }
     }
-
   </script>
 </head>
 <body>
@@ -73,6 +74,13 @@
 <form id="salt_form">
   <input id="salt" type="text" style="width: 30em; font-family: monospace"
          placeholder="Paste an existing salt here, or click generate..">
+  <input type="submit" value="Generate">
+</form>
+
+<h3>keys</h3>
+<form id="keys_form">
+  <input id="signing" type="text" style="width: 30em; font-family: monospace"
+         placeholder="Paste an existing SIGNING key here, or click generate..">
   <input type="submit" value="Generate">
 </form>
 
@@ -85,23 +93,38 @@
   <input type="submit" value="Create">
 </form>
 <h3>Settings</h3>
-<div id="settings" style="font-family: monospace"></div>
+<div id="settings" style="font-family: monospace; width: calc(100vw - 2rem);
+overflow-wrap: break-word; border: 1px solid lightgray; padding: 0.5rem"></div>
 
+<h2>Tests</h2>
+<form>
+  Cook
+</form>
+<script async>
+  // console.log(handleRequest(new Request('foo.html')));
+  // console.log(handleRequest(new Request('foo.html', {headers: {'Cookie': ""}})));
+  const loginReq = new Request(BASE + '/login', {
+      method: 'POST', // or 'PUT'
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({'user': 'foo', 'password': 'bar'}),
+  });
+  window.addEventListener('load', async (event) => {
+      await handleLogin(loginReq);
+  });
+</script>
 <script>
-    var form = document.getElementById("newuser");
-    form.addEventListener("submit", function(evt) {
-        evt.preventDefault();
-        newUser();
-        return false;
-    });
-
-    var form = document.getElementById("salt_form");
-    form.addEventListener("submit", function(evt) {
-        evt.preventDefault();
-        saltGen();
-        return false;
-    });
-
+    document.getElementById("newuser").addEventListener("submit",
+        function(evt) {evt.preventDefault(); newUser(); return false;
+        });
+    document.getElementById("salt_form").addEventListener("submit",
+        function(evt) { evt.preventDefault(); saltGen(); return false;
+        });
+    document.getElementById("keys_form").addEventListener("submit",
+        function(evt) { evt.preventDefault(); keyGen(); return false;
+        });
+    addEventListener('fetch', (event) => {
+        console.log(`event ${JSON.stringify(event)}`)
+    })
 </script>
 </body>
 </html>

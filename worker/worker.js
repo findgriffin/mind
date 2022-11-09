@@ -5,71 +5,73 @@
  * Some browsers may show "Enter user name and password to access REALM"
  */
 
-const REALM = 'Secure Area';
-const BASE = 'https://mind-2ov.pages.dev/';
-const AUTH = 'Authorization';
-const EXPECTED = '340918340982349090874231947234';
-
-const USERS = {
-  'kk': 'bobcat',
-  'davo': 'bobby',
-};
-/* from https://github.com/jshttp/cookie/blob/master/index.js */
-function parse(str, options) {
-  if (typeof str !== 'string') {
-    throw new TypeError('argument str must be a string');
+// From https://bitcoin.stackexchange.com/questions/52727/
+// byte-array-to-hexadecimal-and-back-again-in-javascript
+function toHexString(byteArray) {
+  return Array.prototype.map.call(byteArray, function(byte) {
+    return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+  }).join('');
+}
+function toByteArray(hexString) {
+  var result = [];
+  for (var i = 0; i < hexString.length; i += 2) {
+    result.push(parseInt(hexString.substr(i, 2), 16));
   }
-
-  var obj = {}
-  var opt = options || {};
-  var dec = opt.decode || decode;
-
-  var index = 0
-  while (index < str.length) {
-    var eqIdx = str.indexOf('=', index)
-
-    // no more cookie pairs
-    if (eqIdx === -1) {
-      break
-    }
-
-    var endIdx = str.indexOf(';', index)
-
-    if (endIdx === -1) {
-      endIdx = str.length
-    } else if (endIdx < eqIdx) {
-      // backtrack on prior semicolon
-      index = str.lastIndexOf(';', eqIdx - 1) + 1
-      continue
-    }
-
-    var key = str.slice(index, eqIdx).trim()
-
-    // only assign once
-    if (undefined === obj[key]) {
-      var val = str.slice(eqIdx + 1, endIdx).trim()
-
-      // quoted values
-      if (val.charCodeAt(0) === 0x22) {
-        val = val.slice(1, -1)
-      }
-
-      obj[key] = tryDecode(val, dec);
-    }
-
-    index = endIdx + 1
-  }
-
-  return obj;
+  return result;
 }
 
-addEventListener('fetch', (event) => {
-  event.respondWith(handleRequest(event.request))
-})
+function parseCookies(cookie_str) {
+  decode = decodeURIComponent
+  return cookie_str.split(';').map(c=>c.split('=')).reduce(
+      (obj, cook) => {obj[decode(cook[0])] = decode(cook[1]); return obj
+  }, {});
+}
+
+async function hashPassword(salt, password) {
+  const myDigest = await crypto.subtle.digest(
+      {name: 'SHA-256'}, new TextEncoder().encode(salt + password)
+  );
+  return new Uint8Array(myDigest);
+}
 
 async function hasAuthCookie(request) {
-  const cookies = parse(request.headers.get('Cookie') || '');
-  return cookie[AUTH] != null && cookie[AUTH] == EXPECTED;
+  const cookies = parseCookies(request.headers.get('Cookie') || '');
+  return cookies[AUTH] != null && cookies[AUTH] == EXPECTED;
+}
+
+function generateCookie() {
+  return "cookie"
+}
+
+async function loginUser(body_json) {
+  let {user, password } = body_json;
+  if (user && password) {
+    if (user in USERS) {
+      if (USERS[user] == toHexString(await hashPassword(SALT, password))) {
+        return generateCookie()
+      } else {
+        console.log('bad password');
+      }
+    } else {
+      console.log('no such user');
+    }
+  } else {
+    console.log('missing user or password');
+  }
+  return false;
+}
+
+async function handleLogin(request) {
+  const body_json = await request.json();
+  console.log('handling login');
+
+  if (request.headers.get('Content-Type') == 'application/json' && body_json) {
+    const cookie = await loginUser(body_json);
+    console.log(cookie)
+  } else {
+    console.log('bad content');
+    return false;
+  }
 }
 
 async function handleRequest(request) {
@@ -114,3 +116,7 @@ function getUnauthorizedResponse(message) {
   response.headers.set('WWW-Authenticate', `Basic realm="${REALM}"`)
   return response
 }
+
+addEventListener('fetch', (event) => {
+  event.respondWith(handleRequest(event.request))
+})

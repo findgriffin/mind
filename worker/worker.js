@@ -57,9 +57,10 @@ async function generateCookie(key) {
 async function loginUser(body_json) {
   let {user, password } = body_json;
   if (user && password) {
-    if (user in USERS) {
-      if (USERS[user] == toHexString(await hashPassword(SALT, password))) {
-        return generateCookie()
+    console.log(`logging in ${user} ${password}`);
+    if (user in LOGIN) {
+      if (LOGIN[user] == toHexString(await hashPassword(SALT, password))) {
+        return generateCookie(KEY)
       } else {
         console.log('bad password');
       }
@@ -74,7 +75,6 @@ async function loginUser(body_json) {
 
 async function handleLogin(request) {
   const body_json = await request.json();
-  console.log('handling login');
 
   if (request.headers.get('Content-Type') == 'application/json' && body_json) {
     const cookie = await loginUser(body_json);

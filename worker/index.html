@@ -3,34 +3,48 @@
 <head>
   <meta charset="utf-8">
   <title>TESTING CloudFlare Workers</title>
+  <style>
+      form {
+          display: grid;
+          grid-template-columns: 6em minmax(20em, 50em) 8em;
+          grid-gap: 0.5rem;
+          font-family: monospace;
+      }
+      label {
+          grid-column: 1 / 2;
+          font-family: monospace;
+      }
+      .adduser, textarea {
+          grid-column: 2 / 3;
+          font-family: monospace;
+          width: calc(100% - 1em);
+      }
+      .adduser {
+          padding: 0;
+          border: none;
+      }
+      button {
+          grid-column: 3 / 4;
+          font-family: monospace;
+          height: fit-content;
+          width: fit-content;
+      }
+      .half {
+          width: 10rem;
+      }
+
+  </style>
+  </style>
   <script>
-      // Put stuff here to simulate Workers env vars
-    let SALT = '1234';
+    // Put stuff here to simulate Workers env vars
+    let SALT = null;
     const BASE = 'http://localhost:8000';
     let KEY = null;
     const USERS = {};
     const LOGIN = {};
   </script>
-  <script src="./worker.js"></script>
+  <script src="./setup.js"></script>
   <script>
-
-
-      function randomHex(len_bytes) {
-          const arr = new Uint8Array(len_bytes);
-          crypto.getRandomValues(arr);
-          return Array.from(arr).map(i => i.toString(16)).join('');
-      }
-    async function saltGen() {
-        let current = document.getElementById('salt');
-        if (current.value) {
-            console.log('Clear salt to generate a new one');
-        } else {
-            current.value = randomHex(16)
-            SALT = current.value;
-        }
-        return false;
-    }
-
     async function keyGen() {
         let s_key = document.getElementById('signing');
         if (s_key.value) {
@@ -47,8 +61,10 @@
         return false;
     }
 
-    function updateUsers(newName, newId, newHash) {
-        const settings = document.getElementById('settings');
+    async function addUser(newName, password) {
+        const newHash = toHexString(await hashPassword(SALT, password))
+        const newId = randomHex(4);
+
         if (newId in USERS) {
             console.error('user ID collision!')
         } else if (newName in LOGIN) {
@@ -56,13 +72,8 @@
         } else {
             USERS[newId] = newName;
             LOGIN[newName] = newHash;
-            txt = `SALT\n${SALT}\n`
-
-            txt += 'USERS:\n'
-            txt += JSON.stringify(USERS);
-            txt += '\nLOGIN:\n'
-            txt += JSON.stringify(LOGIN);
-            settings.innerText = txt
+            document.getElementById('users').value = JSON.stringify(USERS);
+            document.getElementById('login').value = JSON.stringify(LOGIN);
         }
     }
 
@@ -70,11 +81,9 @@
         const password = document.getElementById('pass').value;
         const name = document.getElementById('username').value;
         const salt = document.getElementById('salt').value;
-        const id = randomHex(4);
+        console.log('new');
         if (salt && name && password) {
-            const hash = toHexString(await hashPassword(salt, password))
-            console.log(`${id}: ${hash} (${name})`);
-            updateUsers(name, id, hash)
+            addUser(name, password)
         } else {
             console.log('Need a salt, name, and password to add user.')
         }
@@ -83,61 +92,54 @@
 </head>
 <body>
 <h2>Mind Setup</h2>
-<h3>Salt</h3>
 <form id="salt_form">
-  <input id="salt" type="text" style="width: 30em; font-family: monospace"
-         placeholder="Paste an existing salt here, or click generate..">
-  <input type="submit" value="Generate">
+    <label id="base-label" for="salt">BASE</label>
+    <textarea id="base" type="text" rows=1>http://localhost:8000</textarea>
+    <label id="salt-label" for="salt">SALT</label>
+    <textarea id="salt" type="text" rows=1
+              placeholder="Paste an existing salt here, or click generate.."></textarea>
+    <button onclick="saltGen()" type="button">Generate</button>
+    <label id="signing-label" for="signing" >SIGNING</label>
+    <textarea id="signing" type="text" rows=3
+              placeholder="Paste an existing SIGNING key here, or click generate.."></textarea>
+    <button onclick="keyGen()" type="button">Generate</button>
+  <label id="users-label" for="users" >USERS</label>
+  <textarea id="users" type="text" rows=5
+            placeholder="Add users..."></textarea>
+  <label id="login-label" for="login" >LOGIN</label>
+  <textarea id="login" type="text" rows=5
+            placeholder="Add users..."></textarea>
+  <fieldset class="adduser">
+    <input class="half" id="username" placeholder="name" type="text" class="half">
+    <input class="half" id="pass" name="password" placeholder="password.." type="password">
+  </fieldset>
+  <button onclick="newUser()" type="button">Add</button>
 </form>
-
-<h3>keys</h3>
-<form id="keys_form">
-  <input id="signing" type="text" style="width: 30em; font-family: monospace"
-         placeholder="Paste an existing SIGNING key here, or click generate..">
-  <input type="submit" value="Generate">
-</form>
-
-<h3>New user</h3>
-<form name="newuser" id="newuser">
-  <input id="username" placeholder="name" type="text">
-  <br>
-  <input id="pass" name="password" placeholder="password.." type="password">
-  <br>
-  <input type="submit" value="Create">
-</form>
-<h3>Settings</h3>
-<div id="settings" style="font-family: monospace; width: calc(100vw - 2rem);
-overflow-wrap: break-word; border: 1px solid lightgray; padding: 0.5rem"></div>
 
 <h2>Tests</h2>
-<form>
-  Cook
-</form>
 <script async>
+    function runTests() {
+        console.log('running tests');
+        saltGen();
+        keyGen();
+        test_user = {user: 'alice', password: 'password'};
+        addUser(test_user.user, test_user.password);
+        const loginReq = new Request(BASE + '/login', {
+            method: 'POST', // or 'PUT'
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(test_user),
+        });
+        handleLogin(loginReq);
+    }
   // console.log(handleRequest(new Request('foo.html')));
   // console.log(handleRequest(new Request('foo.html', {headers: {'Cookie': ""}})));
-  const loginReq = new Request(BASE + '/login', {
-      method: 'POST', // or 'PUT'
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({'user': 'foo', 'password': 'bar'}),
-  });
-  window.addEventListener('load', async (event) => {
-      await handleLogin(loginReq);
-  });
 </script>
 <script>
-    document.getElementById("newuser").addEventListener("submit",
-        function(evt) {evt.preventDefault(); newUser(); return false;
-        });
-    document.getElementById("salt_form").addEventListener("submit",
-        function(evt) { evt.preventDefault(); saltGen(); return false;
-        });
-    document.getElementById("keys_form").addEventListener("submit",
-        function(evt) { evt.preventDefault(); keyGen(); return false;
-        });
     addEventListener('fetch', (event) => {
         console.log(`event ${JSON.stringify(event)}`)
     })
 </script>
+<button onclick="runTests()" type="button">Run tests</button>
+<script src="./worker.js"></script>
 </body>
 </html>

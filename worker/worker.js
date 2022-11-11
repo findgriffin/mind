@@ -128,7 +128,7 @@ async function handleRequest(request) {
     if (await isAuthorized(request)) {
       return await fetch(request);
     } else {
-      return getUnauthorizedResponse();
+      return await fetch(BASE + '/login');
     }
   }
 }

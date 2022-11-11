@@ -150,6 +150,7 @@
             body: JSON.stringify(test_user)}), 200, ['AuthCookie',
             'Content-Type'], (body) => body.includes('Logged'));
         const auth_cookie = good.headers.get('AuthCookie');
+        console.log(auth_cookie);
 
         const bad = await runTest('bad_login', new Request(BASE + '/login', {
             method: 'POST', // or 'PUT'

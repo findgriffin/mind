@@ -156,7 +156,7 @@ class Stuff(NamedTuple):
         return [f"[Created {self.id}] {tags.canonical()}",
                 self.body, "-" * 40]
 
-    def canonical(self, phase: Phase = None):
+    def canonical(self, phase: Optional[Phase] = None):
         if not phase:
             phase = self.state
         body = self.body if phase == Phase.ACTIVE else ""

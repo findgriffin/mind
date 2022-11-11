@@ -40,6 +40,7 @@
     let SALT = null;
     const BASE = 'http://localhost:8000';
     let KEY = null;
+    let SIGNING = "";
     const USERS = {};
     const LOGIN = {};
   </script>
@@ -56,7 +57,8 @@
             );
             KEY = key;
             jwk = await window.crypto.subtle.exportKey('jwk', key);
-            s_key.value = JSON.stringify(jwk);
+            SIGNING = JSON.stringify(jwk);
+            s_key.value = SIGNING;
         }
         return false;
     }
@@ -141,22 +143,26 @@
     async function runTests() {
         saltGen();
         keyGen();
-        test_user = {user: 'alice', password: 'password'};
+        test_user = {user: 'alice', password: 'bobbythebobcat'};
         addUser(test_user.user, test_user.password);
         console.log('running tests');
         const good = await runTest('good_login', new Request(BASE + '/login', {
             method: 'POST', // or 'PUT'
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(test_user)}), 200, ['AuthCookie',
-            'Content-Type'], (body) => body.includes('Logged'));
+            body: JSON.stringify({user: test_user.user,
+                password: test_user.password})}), 200, ['AuthCookie',
+            'Content-Type'], (body) => body.includes('mind my thoughts'));
         const auth_cookie = good.headers.get('AuthCookie');
-        console.log(auth_cookie);
 
+        const wrong_data = new FormData();
+        wrong_data.append('user', 'alice');
+        wrong_data.append('password', 'wrong');
         const bad = await runTest('bad_login', new Request(BASE + '/login', {
             method: 'POST', // or 'PUT'
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({user: 'alice', password: 'wrong'})}),
-            401, ['Content-Type'], (body) => body == 'Unauthorized');
+            body: JSON.stringify({user: test_user.user,
+                password: 'wrong'})}), 401,
+            ['Content-Type'], (body) => body == 'Unauthorized');
 
         const good_get = await runTest('good_get', new Request(BASE +
                 '/static/index.html', { headers: new Headers(
@@ -165,9 +171,8 @@
             (body) => body.includes('html'));
         const bad_get = await runTest('bad_get', new Request(BASE +
                 '/static/index.html', {
-                headers: {Cookie: 'auth=foo.bar'}}), 401, ['Content-Type'],
-            (body) => body.includes('Unauthorized'));
-        console.log(good && bad && good_get && bad_get ? 'ALL PASSED!' : 'nope')
+                headers: {Cookie: 'auth=foo.bar'}}), 200, ['Content-Type'],
+            (body) => body.includes('What\'s the password?'));
     }
 </script>
 <script>

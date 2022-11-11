@@ -118,21 +118,56 @@
 
 <h2>Tests</h2>
 <script async>
-    function runTests() {
-        console.log('running tests');
+    function validate(test, msg, truth) {
+        if (truth) {
+            return true;
+        } else {
+            console.error(`${test}.${msg}: failed`);
+            return false;
+        }
+    }
+    async function runTest(name, request, status, headers, bodyTest) {
+        const resp = await handleRequest(request);
+        const stat = validate(name, `status expected ${status}`,
+            resp.status == status);
+        const hdrs = Array.from(headers).map((hdr) =>
+            validate(name, `header ${hdr} missing`, resp.headers.has(hdr))
+        ).reduce((prev, i) => prev && i, true );
+        const txt = validate(name, 'body', bodyTest(await resp.text()));
+        const result = stat && hdrs && txt ? 'pass' : 'FAILED';
+        console.log(`${name}: ${result}`)
+        return resp
+    }
+    async function runTests() {
         saltGen();
         keyGen();
         test_user = {user: 'alice', password: 'password'};
         addUser(test_user.user, test_user.password);
-        const loginReq = new Request(BASE + '/login', {
+        console.log('running tests');
+        const good = await runTest('good_login', new Request(BASE + '/login', {
             method: 'POST', // or 'PUT'
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(test_user),
-        });
-        handleLogin(loginReq);
+            body: JSON.stringify(test_user)}), 200, ['AuthCookie',
+            'Content-Type'], (body) => body.includes('Logged'));
+        const auth_cookie = good.headers.get('AuthCookie');
+
+        const bad = await runTest('bad_login', new Request(BASE + '/login', {
+            method: 'POST', // or 'PUT'
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({user: 'alice', password: 'wrong'})}),
+            401, ['Content-Type'], (body) => body == 'Unauthorized');
+
+        const good_get = await runTest('good_get', new Request(BASE +
+                '/static/index.html', { headers: new Headers(
+                    {'Authorization': `Bearer ${auth_cookie}`,
+                     'Cookie': auth_cookie})}), 200, ['Content-Type'],
+            (body) => body.includes('html'));
+        const bad_get = await runTest('bad_get', new Request(BASE +
+                '/static/index.html', {
+                headers: {Cookie: 'auth=foo.bar'}}), 401, ['Content-Type'],
+            (body) => body.includes('Unauthorized'));
+        console.log(good && bad && good_get && bad_get ? 'ALL PASSED!' : 'nope')
     }
-  // console.log(handleRequest(new Request('foo.html')));
-  // console.log(handleRequest(new Request('foo.html', {headers: {'Cookie': ""}})));
 </script>
 <script>
     addEventListener('fetch', (event) => {

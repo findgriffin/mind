@@ -1,9 +1,20 @@
 AUTH = 'Authorization'
 COOKIE_ALGO = {name: "HMAC"}
-// TODO: implement hex conversion https://stackoverflow.com/a/50868276/12376646
+PAGE = "https://mind-2ov.pages.dev";
 
-// From https://bitcoin.stackexchange.com/questions/52727/
-// byte-array-to-hexadecimal-and-back-again-in-javascript
+if (typeof(USERS) == 'string') {
+  USERS = JSON.parse(USERS)
+}
+
+if (typeof(LOGIN) == 'string') {
+  LOGIN = JSON.parse(LOGIN)
+}
+HMAC = {name: "HMAC", hash: {name: "SHA-256"}};
+
+async function importKey() {
+  return await crypto.subtle.importKey("jwk", JSON.parse(SIGNING), HMAC, "true", ["sign", "verify"])
+}
+
 function toHexString(byteArray) {
   return Array.prototype.map.call(byteArray, function(byte) {
     return ('0' + (byte & 0xFF).toString(16)).slice(-2);
@@ -23,8 +34,8 @@ function toByteArray(hexString) {
 function parseCookies(cookie_str) {
   decode = decodeURIComponent
   return cookie_str.split(';').map(c=>c.split('=')).reduce(
-      (obj, cook) => {obj[decode(cook[0])] = decode(cook[1]); return obj
-  }, {});
+      (obj, cook) => {obj[decode(cook[0]).trim()] = decode(cook[1]).trim(); return obj
+      }, {});
 }
 
 async function hashPassword(salt, password) {
@@ -39,7 +50,8 @@ async function validateToken(token) {
   if (parts.length == 2) {
     const data = new Uint8Array(toByteArray(parts[0]));
     const signature = new Uint8Array(toByteArray(parts[1]));
-    return await crypto.subtle.verify(COOKIE_ALGO, KEY, signature, data);
+    const key = await importKey();
+    return await crypto.subtle.verify(COOKIE_ALGO, key, signature, data);
   } else {
     return false;
   }
@@ -48,6 +60,8 @@ async function validateToken(token) {
 async function isAuthorized(request) {
   const hdrs = request.headers;
   const cookies = parseCookies(hdrs.get('Cookie') || '');
+  console.log(`Cookies recieved: ${JSON.stringify(cookies)}`);
+  console.log(`${AUTH} cookie: ${cookies[AUTH]}`);
   if (AUTH in cookies) {
     return validateToken(cookies[AUTH])
   } else {
@@ -61,20 +75,21 @@ async function isAuthorized(request) {
 }
 
 
-async function generateCookie(key) {
+async function generateCookie(importedKey) {
   const data = new Uint8Array(32);
   crypto.getRandomValues(data);
-  const sig = await crypto.subtle.sign(COOKIE_ALGO, key, data);
+  const sig = await crypto.subtle.sign(COOKIE_ALGO, importedKey, data);
   const part2 = new Uint8Array(sig);
   return `${toHexAlt(data)}.${toHexAlt(part2)}`;
 }
 
-async function loginUser(body_json) {
-  let {user, password } = body_json;
+async function loginUser(user, password) {
   if (user && password) {
     if (user in LOGIN) {
       if (LOGIN[user] == toHexString(await hashPassword(SALT, password))) {
-        return await generateCookie(KEY)
+        key = await importKey();
+        console.log(`SIGNING: ${SIGNING} key ${key}`)
+        return await generateCookie(key)
       } else {
         console.log('bad password');
       }
@@ -96,22 +111,30 @@ function getUnauthorizedResponse() {
 }
 
 async function handleLogin(request) {
-  const body_json = await request.json();
-  if (request.headers.get('Content-Type') == 'application/json' && body_json) {
-    const cookie = await loginUser(body_json);
-    // TODO path=/; domain=[DOMAIN]; secure;
-    // https://www.mikestreety.co.uk/blog/using-cloudflare-workers-to-set-a-cookie-based-on-a-get-parameter-or-path/
-    if (cookie) {
-      let resp = new Response('Logged in!');
-      const auth_cookie = `auth=${cookie}`
-      resp.headers.set('Set-Cookie', `${auth_cookie}; Secure; HttpOnly`);
-      resp.headers.append('AuthCookie', auth_cookie);
-      return resp;
-    } else {
-      return getUnauthorizedResponse();
-    }
+  const content_type = request.headers.get('Content-Type');
+  let user = null; let password = null;
+  if (content_type == 'application/json') {
+    data = await request.json()
+    user = data['user'];
+    password = data['password'];
   } else {
-    console.warn('bad content');
+    const formData = await request.formData();
+    user = formData.get('user');
+    password = formData.get('password');
+  }
+  const cookie = await loginUser(user, password);
+  // TODO path=/; domain=[DOMAIN]; secure;
+  // https://www.mikestreety.co.uk/blog/using-cloudflare-workers-to-set-a-cookie-based-on-a-get-parameter-or-path/
+  if (cookie) {
+    const resp = await fetch(PAGE);
+
+    // Clone the response so that it's no longer immutable
+    const newResp = new Response(resp.body, resp);
+    const auth_cookie = `${AUTH}=${cookie}`
+    newResp.headers.set('Set-Cookie', `${auth_cookie}; Secure; HttpOnly`);
+    newResp.headers.append('AuthCookie', auth_cookie);
+    return newResp;
+  } else {
     return getUnauthorizedResponse();
   }
 }
@@ -119,16 +142,16 @@ async function handleLogin(request) {
 
 async function handleRequest(request) {
   if (request.method == 'POST') {
-    if (request.url == `${BASE}/login`) {
+    if (request.url.endsWith('/login')) {
       return await handleLogin(request)
     } else {
       return getNotFoundResponse();
     }
   } else if (request.method == 'GET') {
     if (await isAuthorized(request)) {
-      return await fetch(request);
+      return await fetch(PAGE);
     } else {
-      return await fetch(BASE + '/login');
+      return await fetch(PAGE + '/login');
     }
   }
 }

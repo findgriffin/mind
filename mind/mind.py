@@ -382,16 +382,17 @@ def order_and_filter(args: argparse.Namespace) -> tuple[bool, Optional[str]]:
     except AttributeError:
         return latest, None
 
-
-def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
+def list_inner(mind: Mind, args: argparse.Namespace) -> list[tuple]:
     latest, filter_arg = order_and_filter(args)
     filter = parse_filter(filter_arg)
     logging.debug(f"Listing latest: {latest} filter: {filter}")
     offset = (args.page - 1) * args.num
-    fetched = QueryStuff(latest=latest,
-                         tag=filter.val,
-                         offset=offset,
-                         limit=args.num+1).fetchall(mind)
+    return QueryStuff(latest=latest, tag=filter.val, offset=offset,
+                      limit=args.num+1).fetchall(mind)
+
+
+def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
+    fetched = list_inner(mind, args)
     noun = "latest" if latest else "oldest"
     output = [f" # Currently minding [{noun}] [{filter}] "
               f"[num={args.num}]...", H_RULE]

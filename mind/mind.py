@@ -32,6 +32,15 @@ Params = Union[dict, tuple]
 Operation = tuple[str, Params]
 
 
+class Order(Enum):
+    LATEST = "DESC"
+    OLDEST = "ASC"
+
+
+def to_order(latest: bool) -> Order:
+    return Order.LATEST if latest else Order.OLDEST
+
+
 class IntegrityError(Exception):
     pass
 
@@ -274,21 +283,19 @@ def parse_item(args: str) -> list[int]:
 
 
 class QueryStuff(NamedTuple):
-    latest: bool = True
+    order: Order = Order.LATEST
     limit: int = PAGE_SIZE + 1
     offset: int = 0
     state: Phase = Phase.ACTIVE
     tag: Optional[str] = None
-
-    def order(self) -> str:
-        return "DESC" if self.latest else "ASC"
 
     def cmd(self):
         join1 = "INNER JOIN tags ON stuff.id = tags.id" if self.tag else ""
         join2 = "AND tags.tag = :tag" if self.tag else ""
         return f"SELECT stuff.id, stuff.body FROM stuff {join1} "\
                f"WHERE stuff.state = :state {join2} " \
-               f"ORDER BY stuff.id {self.order()} LIMIT :limit OFFSET :offset"
+               f"ORDER BY stuff.id {self.order.value} LIMIT :limit OFFSET " \
+               f":offset"
 
     def fetchall(self, mind: Mind) -> list[Stuff]:
         cur = mind.query(self.cmd(), self._asdict())
@@ -374,27 +381,24 @@ def parse_filter(arg: Optional[str]) -> Filter:
         return Filter()
 
 
-def order_and_filter(args: argparse.Namespace) -> tuple[bool, Optional[str]]:
+def order_and_filter(args: argparse.Namespace) -> tuple[Order, Optional[str]]:
     latest = CMD not in args or args.cmd != CLEAN
+    order = to_order(latest)
     try:
         filter = args.list if latest else args.clean
-        return latest, filter
+        return order, filter
     except AttributeError:
-        return latest, None
-
-def list_inner(mind: Mind, args: argparse.Namespace) -> list[tuple]:
-    latest, filter_arg = order_and_filter(args)
-    filter = parse_filter(filter_arg)
-    logging.debug(f"Listing latest: {latest} filter: {filter}")
-    offset = (args.page - 1) * args.num
-    return QueryStuff(latest=latest, tag=filter.val, offset=offset,
-                      limit=args.num+1).fetchall(mind)
+        return order, None
 
 
 def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
-    fetched = list_inner(mind, args)
-    noun = "latest" if latest else "oldest"
-    output = [f" # Currently minding [{noun}] [{filter}] "
+    order, filter_arg = order_and_filter(args)
+    filter = parse_filter(filter_arg)
+    logging.debug(f"Listing {order.name} filter: {filter}")
+    offset = (args.page - 1) * args.num
+    fetched = QueryStuff(order=order, tag=filter.val, offset=offset,
+                         limit=args.num+1).fetchall(mind)
+    output = [f" # Currently minding [{order.name.lower()}] [{filter}] "
               f"[num={args.num}]...", H_RULE]
     if fetched:
         for index, row in enumerate(fetched[:args.num], 1):

@@ -1,6 +1,7 @@
 mypy
 flake8
 coverage
+flask
 
 # For import_evernote.py script
 lxml

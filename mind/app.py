@@ -1,10 +1,7 @@
 #!/usr/bin/env python
-from argparse import Namespace
-
 from flask import Flask, jsonify, request
 
-from mind import QueryStuff, Mind, Order, PAGE_SIZE, Phase
-import mind
+from mind.mind import DEFAULT_DB, QueryStuff, Mind, Order, PAGE_SIZE, Phase
 
 app = Flask(__name__)
 
@@ -19,7 +16,7 @@ TAG = 'tag'
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    mnd = Mind(mind.DEFAULT_DB)
+    mnd = Mind(DEFAULT_DB)
     if QUERY in request.json:
         query = request.json[QUERY]
         order = Order[query[ORDER]] if ORDER in query else Order.LATEST

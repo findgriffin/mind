@@ -40,7 +40,7 @@ class TestFsPerf(TestCase):
         # Given
         iterations = 10*365
         # When / Then
-        self.assertLessEqual(Timer(self.do_iteration).timeit(iterations), 8)
+        self.assertLessEqual(Timer(self.do_iteration).timeit(iterations), 9)
         self.assertLess(stat(Path(self.tmp.name)).st_size / 1024, 500)
 
     def test_big_db(self):

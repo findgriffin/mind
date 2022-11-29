@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-from flask import Flask, jsonify, request, Response, send_from_directory, \
-    render_template
+from flask import Flask, jsonify, request, Response
 
 from mind import DEFAULT_DB, QueryStuff, Mind, Order, PAGE_SIZE, Phase, \
-    add_content, do_tick, update_state, Stuff
+    add_content, update_state, Stuff
 
 app = Flask(__name__, static_url_path="", static_folder="../static")
 

@@ -3,7 +3,7 @@ from datetime import datetime as dt, timezone as tz
 from enum import IntEnum, Enum
 from pathlib import Path
 from sqlite3 import Cursor, PARSE_DECLTYPES
-from textwrap import wrap, shorten
+from textwrap import shorten
 from typing import NamedTuple, Callable, Optional, NewType, Union
 import argparse
 import hashlib

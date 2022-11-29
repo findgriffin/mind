@@ -408,9 +408,9 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
     if len(fetched) > args.num:
         output.append("    And more...")
     tags = ", ".join([t.tag for t in QueryTags(id=None).execute(mind)])
-    wrapped = wrap(f"Latest tags: {tags}", initial_indent="  ",
-                   subsequent_indent=" " * 15)
-    return output + [H_RULE] + wrapped + [H_RULE]
+    shortened = shorten(f"Latest tags: {tags}", width=70,
+                        placeholder=" ...")
+    return output + [H_RULE, shortened, H_RULE]
 
 
 def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> str:
@@ -498,7 +498,7 @@ def do_history(mind: Mind, args: argparse.Namespace) -> list[str]:
 
 
 def add_content(mind: Mind, content: list[str], state: Phase = Phase.ACTIVE,
-                parent: Optional[Record] = None) -> list[str]:
+                parent: Optional[Record] = None) -> tuple[Stuff, Tags]:
     stuff, tags, timestamp = new_stuff(content, state)
     logging.debug(f"Adding: {stuff.preview()} tags:{tags}")
     change = Change(mind.head() if parent is None else parent, stuff,
@@ -510,16 +510,21 @@ def add_content(mind: Mind, content: list[str], state: Phase = Phase.ACTIVE,
     ops.insert(0, (insert(STUFF, stuff), stuff._asdict()))
     ops.append((insert("log", record), record._asdict()))
     mind.tx(ops)
-    return [f"Added {stuff} {tags.canonical()}"]
+    return stuff, tags
+
+
+def get_content(args: argparse.Namespace) -> list[str]:
+    if args.text:
+        return [args.text]
+    elif args.file:
+        return Path(args.file).read_text().splitlines()
+    else:
+        return [input("Add stuff: ")]
 
 
 def do_add(mind: Mind, args: argparse.Namespace) -> list[str]:
-    if args.text:
-        return add_content(mind, [args.text])
-    elif args.file:
-        return add_content(mind, Path(args.file).read_text().splitlines())
-    else:
-        return add_content(mind, [input("Add stuff: ")])
+    stuff, tags = add_content(mind, get_content(args))
+    return [f"Added {stuff} {tags.canonical()}"]
 
 
 def setup_logging(verbose: bool = False):

@@ -410,7 +410,7 @@ def do_list(mind: Mind, args: argparse.Namespace) -> list[str]:
     tags = ", ".join([t.tag for t in QueryTags(id=None).execute(mind)])
     shortened = shorten(f"Latest tags: {tags}", width=70,
                         placeholder=" ...")
-    return output + [H_RULE, shortened, H_RULE]
+    return output + [H_RULE, "  " + shortened, H_RULE]
 
 
 def update_state(old_stuff: Stuff, mind: Mind, new_state: Phase) -> str:

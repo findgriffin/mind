@@ -7,8 +7,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta property="og:title" content="mind">
   <meta property="og:type" content="website">
+  <script src="app.js"></script>
 </head>
-<body>
+<body id="body">
 <style>
     * {
         box-sizing: border-box;
@@ -163,44 +164,17 @@
   </a>
   </nav>
 </header>
-<article>
-  <p>
-  <h4>#TODO</h4>
-  <ol>
-    <li>
-      <input type="checkbox" id="todo-1" name="todo" value="todo">
-      <label for="todo-1" data-content="run NYC marathon">run NYC marathon</label>
-    </li>
-    <li>
-      <input type="checkbox" id="todo-2" name="todo" value="todo">
-      <label for="todo-2" data-content="eat pizza">eat pizza</label>
-    </li>
-    <li>
-      <input type="checkbox" id="todo-3" name="todo" value="todo">
-      <label for="todo-3" data-content="drink beer">drink beer</label>
-    </li>
-  </ol>
-  </p>
-</article>
-<article>
-  <p>
-  <h4>#Groceries</h4>
-  <ol>
-    <li>
-      <input type="checkbox" id="groceries-1" name="todo" value="todo">
-      <label for="groceries-1" data-content="milk">milk</label>
-    </li>
-    <li>
-      <input type="checkbox" id="groceries-2" name="todo" value="todo">
-      <label for="groceries-2" data-content="eggs">eggs</label>
-    </li>
-    <li>
-      <input type="checkbox" id="groceries-3" name="todo" value="todo">
-      <label for="groceries-3" data-content="beer"> beer</label>
-    </li>
-  </ol>
-  </p>
-</article>
-
+<template id="item">
+  <li>
+    <input type="checkbox">
+    <label></label>
+  </li>
+</template>
+<template id="article">
+  <article>
+    <h4></h4>
+    <ol></ol>
+  </article>
+</template>
 </body>
 </html>

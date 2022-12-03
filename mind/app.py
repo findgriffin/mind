@@ -1,8 +1,9 @@
 #!/usr/bin/env python
+
 from flask import Flask, jsonify, request, Response
 
-from mind import DEFAULT_DB, QueryStuff, Mind, Order, PAGE_SIZE, Phase, \
-    add_content, update_state, Stuff
+from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase,\
+    add_content, setup_logging, update_state, Stuff
 
 app = Flask(__name__, static_url_path="", static_folder="../static")
 
@@ -33,13 +34,16 @@ def index():
         stuff, tags = add_content(mnd, request.json[ADD])
         return jsonify({'tags': [t.tag for t in tags]})
     elif TICK in request.json:
-        stf = Stuff(request.json[TICK]['id'], "", state=Phase.ACTIVE)
+        stf = Stuff(Epoch(request.json[TICK]['id']),
+                    request.json[TICK]['body'], state=Phase.ACTIVE)
         return jsonify({'updated': update_state(stf, mnd, Phase.DONE)})
     elif UNTICK in request.json:
-        stf = Stuff(request.json[UNTICK]['id'], "", state=Phase.DONE)
+        stf = Stuff(Epoch(request.json[UNTICK]['id']),
+                    request.json[TICK]['body'], state=Phase.DONE)
         return jsonify({'updated': update_state(stf, mnd, Phase.ACTIVE)})
     else:
         return Response(400)
 
 
+setup_logging(True)
 app.run()

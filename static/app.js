@@ -9,12 +9,12 @@ async function getTag(tag) {
     return resp.json();
 }
 
-async function doStuff(operation, id) {
+async function doStuff(operation, id, body) {
     console.log(`Doing ${operation} for ${id}`)
     await fetch(API, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({[operation]: {'id': id}})
+        body: JSON.stringify({[operation]: {'id': id, 'body': body}})
     })
 }
 
@@ -25,7 +25,7 @@ function addItem(id, tagName, record) {
     const label = clone.querySelectorAll('label')[0]
     input.id = `${id}-${tagName}-input`
     input.onchange = async (e) =>  {
-        await doStuff(input.checked ? 'tick' : 'untick', record[0])
+        await doStuff(input.checked ? 'tick' : 'untick', record[0], record[1])
     }
     label.appendChild(document.createTextNode(record[1]));
     label.id = `${id}-${tagName}-label`

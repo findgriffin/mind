@@ -178,7 +178,7 @@ class Stuff(NamedTuple):
         return f"Stuff[{self.id!r},{self.state.name},{self.body}]"
 
     def hash(self):
-        return hashlib.sha1(self.__repr__()).hexdigest()
+        return hashlib.sha1(self.__repr__().encode('utf8')).hexdigest()
 
 
 class Change(NamedTuple):
@@ -256,7 +256,7 @@ class Mind():
         parent, p_stuff, p_tags = self.get_full_record(record.parent())
         change = Change(parent, stuff, record.act(), record.stamp, tags)
         calc_hash = change.hash()
-        computed = f"Computed: {calc_hash} <- {change.canonical()}"
+        computed = f"{calc_hash} <- {change.canonical()}"
         logging.debug(computed)
         if calc_hash == record.hash:
             logging.debug(f"Verified: {record}")

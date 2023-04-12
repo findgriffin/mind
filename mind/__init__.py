@@ -1,17 +1,25 @@
-from .mind import do_add, do_list, do_forget, do_history, do_show, do_tick
-from .mind import CLEAN, CMD, DEFAULT_DB, Mind, PAGE_SIZE, setup_logging
+from .mind import CLEAN, CMD, DEFAULT_DB, Epoch, Mind, Order, PAGE_SIZE, \
+    Phase, QueryStuff, Stuff, add_content, do_add, do_forget, do_history, \
+    do_list, do_show, do_tick, setup_logging, update_state
 
 __all__ = [
-    "do_add",
-    "do_list",
-    "do_forget",
-    "do_history",
-    "do_show",
-    "do_tick",
     "CLEAN",
     "CMD",
     "DEFAULT_DB",
+    "Epoch",
     "Mind",
+    "Order",
     "PAGE_SIZE",
-    "setup_logging"
+    "Phase",
+    "QueryStuff",
+    "Stuff",
+    "add_content",
+    "do_add",
+    "do_forget",
+    "do_history",
+    "do_list",
+    "do_show",
+    "do_tick",
+    "setup_logging",
+    "update_state",
 ]

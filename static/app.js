@@ -66,6 +66,7 @@ async function addArticle(tagName) {
         tags = added.tags // In theory there could be more tags.
         ol.insertBefore(buildItem(tagName, added.stuff), ol.firstChild);
         add.value = ''
+        add.focus()
     }
     clone.querySelectorAll('h4')[0].textContent = `#${tagName}`
     document.getElementById('body').appendChild(clone);

@@ -90,7 +90,7 @@
     input[type=checkbox], input[type=text] {
         position: relative;
         height: 1.5rem;
-        border: 0px solid var(--light);
+        border: none;
         background: var(--gray);
         border-radius: 4px;
         -webkit-appearance: none;
@@ -100,8 +100,34 @@
         cursor: pointer;
         transition: background 175ms cubic-bezier(0.1, 0.1, 0.25, 1);
     }
+    ::placeholder { /* Chrome, Firefox, Opera, Safari 10.1+ */
+        color: var(--accent-dark);
+    }
+    button {
+        margin: 0 0 0 0.5rem;
+        height: 1.5rem;
+        width: 3rem;
+        background: var(--accent);
+        color: var(--dark);
+        border-radius: 4px;
+        -webkit-appearance: none;
+           -moz-appearance: none;
+                appearance: none;
+        outline: none;
+        border: none;
+        cursor: pointer;
+    }
+    button:hover,button:focus {
+        background: var(--accent-dark);
+        color: var(--light);
+    }
+    button:active {
+        background: var(--light);
+        color: var(--dark);
+    }
     input[type=text] {
         color: var(--dark);
+        padding-left: 0.5rem;
     }
     input[type=checkbox] {
         width: 1.5rem;

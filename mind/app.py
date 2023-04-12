@@ -34,7 +34,7 @@ def index():
                                   state=phase, tag=tag).fetchall(mnd))
     elif ADD in request.json:
         stuff, tags = add_content(mnd, request.json[ADD])
-        return jsonify({'tags': [t.tag for t in tags]})
+        return jsonify({'tags': [t.tag for t in tags], 'id': stuff.id})
     elif TICK in request.json:
         stf = Stuff(Epoch(request.json[TICK]['id']),
                     request.json[TICK]['body'], state=Phase.ACTIVE)

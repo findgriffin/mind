@@ -1,5 +1,7 @@
 API = '/'
 
+COUNTERS = {}
+
 async function getTag(tag) {
     const resp = await fetch(API, {
         method: 'POST',
@@ -30,7 +32,8 @@ async function addStuff(tag, body) {
     return resp_json
 }
 
-function buildItem(id, tagName, record) {
+function buildItem(tagName, record) {
+    id = COUNTERS[tagName]
     const template = document.getElementById('item');
     const clone = template.content.cloneNode(true);
     const input = clone.querySelectorAll('input')[0]
@@ -43,6 +46,7 @@ function buildItem(id, tagName, record) {
     label.id = `${id}-${tagName}-label`
     label.setAttribute('data-content', record[1]);
     label.setAttribute('for', `${id}-input`);
+    COUNTERS[tagName]++;
     return clone
 }
 
@@ -51,21 +55,23 @@ async function addArticle(tagName) {
     const items = await getTag(tagName);
     const template = document.getElementById('article');
     const clone = template.content.cloneNode(true);
-    const ol = clone.querySelectorAll('ol')[0]
-    const add = clone.querySelectorAll('input')[0]
-    const add_btn = clone.querySelectorAll('button')[0]
-    add.id = `add-${tagName}`
-    add_btn.id = `add-${tagName}-btn`
+    const ol = clone.querySelectorAll('ol')[0];
+    ol.id = `stuff-${tagName}`
+    const add = clone.querySelectorAll('input')[0];
+    const add_btn = clone.querySelectorAll('button')[0];
+    add.id = `add-${tagName}`;
+    add_btn.id = `add-${tagName}-btn`;
     add_btn.onclick = async (e) =>  {
-        console.log(await addStuff(tagName, add.value))
-        // ol.appendChild(add.value)
-        console.log(`add_btn onclick for ${tagName} is ${add.value}`)
+        added = await addStuff(tagName, add.value);
+        tags = added.tags // In theory there could be more tags.
+        ol.insertBefore(buildItem(tagName, added.stuff), ol.firstChild);
         add.value = ''
     }
     clone.querySelectorAll('h4')[0].textContent = `#${tagName}`
     document.getElementById('body').appendChild(clone);
+    COUNTERS[tagName] = 0
     for (const [i, item] of items.entries()) {
-        ol.appendChild(buildItem(i, tagName, item))
+        ol.appendChild(buildItem(tagName, item))
     }
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import json
 
-from flask import Flask, jsonify, request, Response, logging
+from flask import Flask, jsonify, request, Response
 
 from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase,\
     add_content, setup_logging, update_state, Stuff

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
+import json
 
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, logging
 
 from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase,\
     add_content, setup_logging, update_state, Stuff
@@ -21,6 +22,7 @@ UNTICK = 'untick'
 @app.route('/', methods=['POST'])
 def index():
     mnd = Mind(DEFAULT_DB)
+    app.logger.info(f'Processing request: {json.dumps(request.json)}')
     if QUERY in request.json:
         query = request.json[QUERY]
         order = Order[query[ORDER]] if ORDER in query else Order.LATEST

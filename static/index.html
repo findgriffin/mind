@@ -87,20 +87,25 @@
     }
 
     /* TODO: https://codepen.io/kathykato/pen/xxGObEp */
-    input[type=checkbox] {
+    input[type=checkbox], input[type=text] {
         position: relative;
-        width: 1.5rem;
         height: 1.5rem;
-        color: var(--gray);
-        /* border: 1px solid var(--accent); */
+        border: 0px solid var(--light);
         background: var(--gray);
         border-radius: 4px;
         -webkit-appearance: none;
            -moz-appearance: none;
                 appearance: none;
-        outline: 0;
+        outline: none;
         cursor: pointer;
         transition: background 175ms cubic-bezier(0.1, 0.1, 0.25, 1);
+    }
+    input[type=text] {
+        color: var(--dark);
+    }
+    input[type=checkbox] {
+        width: 1.5rem;
+        color: var(--gray);
     }
     input[type=checkbox]::before {
         position: absolute;

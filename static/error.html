@@ -24,7 +24,7 @@
     h1, h2, h3, h4 {
         font-family: "Courier New", monospace;
     }
-    h3 {
+    h3, h4 {
         color: var(--light);
     }
     main {
@@ -73,8 +73,7 @@
     <h1 id="high-level">Oopsie</h1>
     <h2>A <span id="category">HTTP</span> error has occurred</h2>
     <h3 id="code">Code: Unknown</h3>
-    <h4>Description</h4>
-    <p id="desc">It looks like something went wrong.</p>
+    <h4 id="desc">It looks like something went wrong.</h4>
 </main>
 <script>
     const codes = {
@@ -104,17 +103,18 @@
         505: 'HTTP Version Not Supported',
     }
     const query_str = window.location.search;
+    by_id = (id) => document.getElementById(id);
     if (query_str.slice(0,6) === '?code=') {
         code = parseInt(query_str.slice(6))
         if (code in codes) {
             if (Math.trunc(code / 100) === 5) {
-                document.getElementById('high-level').innerText = 'Our Bad';
-                document.getElementById('category').innerText = 'SERVER';
+                by_id('high-level').innerText = 'Our Bad';
+                by_id('category').innerText = 'SERVER';
             } else if (Math.trunc(code / 100) === 4) {
-                document.getElementById('category').innerText = 'CLIENT';
+                by_id('category').innerText = 'CLIENT';
             }
-            document.getElementById('code').innerText = `Code: ${code}`;
-            document.getElementById('desc').innerText = codes[code];
+            by_id('code').innerText = `Code: ${code}`;
+            by_id('desc').innerText = codes[code];
         }
     } else {
         console.log(`Not able to parse code from ${query_str}`)

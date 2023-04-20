@@ -1,0 +1,126 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>mind:oopsie</title>
+    <meta name="description" content="HTTP Error">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta property="og:title" content="mind:oopsie">
+    <meta property="og:type" content="website">
+</head>
+
+<body>
+<style>
+    :root {
+        --light: #C4DDF2;
+        --dark: #030C26;
+        --gray: #707F8C;
+        --accent: #038C8C;
+        --accent-dark: #014040;
+    }
+    body {
+        background: var(--gray);
+    }
+    h1, h2, h3, h4 {
+        font-family: "Courier New", monospace;
+    }
+    h3 {
+        color: var(--light);
+    }
+    main {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 25rem;
+        background: var(--dark);
+        color: var(--accent);
+        padding: 2rem;
+    }
+    input[type=text],input[type=password], input[type=submit] {
+        width: 100%;
+        padding: 0.5rem 1rem;
+        margin: 0.5rem 0;
+        box-sizing: border-box;
+        font-size: 1.5rem;
+        border: none;
+        box-sizing: border-box;
+        outline: none;
+        color: var(--dark);
+        background: var(--light);
+    }
+
+    input[type=submit] {
+        background-color: var(--accent);
+        color: var(--accent-dark);
+    }
+
+    input[type=submit]:hover {
+        background-color: var(--accent-dark);
+        color: var(--accent);
+    }
+    input[type=text]:focus {
+        border: none;
+    }
+    p {
+        min-height: 3rem;
+    }
+</style>
+
+
+
+<main>
+    <h1 id="high-level">Oopsie</h1>
+    <h2>A <span id="category">HTTP</span> error has occurred</h2>
+    <h3 id="code">Code: Unknown</h3>
+    <h4>Description</h4>
+    <p id="desc">It looks like something went wrong.</p>
+</main>
+<script>
+    const codes = {
+        400: 'Bad Request',
+        401: 'Unauthorized',
+        402: 'Payment Required',
+        403: 'Forbidden',
+        404: 'Not Found',
+        405: 'Method Not Allowed',
+        406: 'Not Acceptable',
+        407: 'Proxy Authentication Required',
+        408: 'Request Timeout',
+        409: 'Conflict',
+        410: 'Gone',
+        411: 'Length Required',
+        412: 'Precondition Failed',
+        413: 'Request Entity Too Large',
+        414: 'Request-URI Too Long',
+        415: 'Unsupported Media Type',
+        416: 'Requested Range Not Satisfiable',
+        417: 'Expectation Failed',
+        500: 'Internal Server Error',
+        501: 'Not Implemented',
+        502: 'Bad Gateway',
+        503: 'Service Unavailable',
+        504: 'Gateway Timeout',
+        505: 'HTTP Version Not Supported',
+    }
+    const query_str = window.location.search;
+    if (query_str.slice(0,6) === '?code=') {
+        code = parseInt(query_str.slice(6))
+        if (code in codes) {
+            if (Math.trunc(code / 100) === 5) {
+                document.getElementById('high-level').innerText = 'Our Bad';
+                document.getElementById('category').innerText = 'SERVER';
+            } else if (Math.trunc(code / 100) === 4) {
+                document.getElementById('category').innerText = 'CLIENT';
+            }
+            document.getElementById('code').innerText = `Code: ${code}`;
+            document.getElementById('desc').innerText = codes[code];
+        }
+    } else {
+        console.log(`Not able to parse code from ${query_str}`)
+    }
+
+</script>
+
+</body>
+</html>

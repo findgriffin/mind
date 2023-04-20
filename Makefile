@@ -43,6 +43,9 @@ branch:
 run:
 	./run.py
 
+local:
+	./mind/app.py
+
 clean:
 	rm -rf venv
 	rm -rf **/__pycache__

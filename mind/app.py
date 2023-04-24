@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import json
 
-from flask import Flask, jsonify, request, Response  # type: ignore
+from flask import Flask, jsonify, request, Response, send_file, \
+    render_template, make_response, redirect, url_for  # type: ignore
+from werkzeug.exceptions import HTTPException
 
 from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase,\
     add_content, setup_logging, update_state, Stuff
@@ -29,8 +31,24 @@ def handle_query(mnd, query):
                               state=phase, tag=tag).fetchall(mnd))
 
 
+@app.get('/')
+def serve_index():
+    return send_file('../static/index.html')
+
+
+@app.get('/error')
+def serve_error():
+    return send_file('../static/error.html')
+
+
+@app.errorhandler(HTTPException)
+def handle_errors(error):
+    app.logger.warning(f'Handling {error.code}: {error.name}')
+    return redirect(f'error?code={error.code}')
+
+
 @app.route('/', methods=['POST'])
-def index():
+def handle_index():
     mnd = Mind(DEFAULT_DB)
     app.logger.info(f'Processing request: {json.dumps(request.json)}')
     if QUERY in request.json:

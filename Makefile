@@ -44,7 +44,7 @@ run:
 	./run.py
 
 local:
-	./mind/app.py
+	./mind/app.py --debug
 
 clean:
 	rm -rf venv

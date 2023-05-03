@@ -8,11 +8,12 @@ from flask import Flask, jsonify, request, Response, send_file, \
     render_template, make_response, redirect, url_for  # type: ignore
 from typing import Optional
 from werkzeug.exceptions import HTTPException
+from werkzeug.security import generate_password_hash
 
 from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase,\
     add_content, setup_logging, update_state, Stuff
 
-app = Flask(__name__, static_url_path="")
+app = Flask(__name__)
 app.secret_key = 'dev'
 app.config.from_object('config')
 
@@ -74,7 +75,7 @@ def handle_login():
 
 @app.get('/login')
 def serve_login():
-    return send_file('../static/login.html')
+    return render_template('login.html')
 
 @app.route('/logout', methods=['POST', 'GET'])
 def logout():
@@ -84,12 +85,12 @@ def logout():
 @app.get('/')
 @login_required
 def serve_index():
-    return send_file('../static/index.html')
+    return render_template('index.html')
 
 
 @app.get('/error')
 def serve_error():
-    return send_file('../static/error.html')
+    return send_file('error.html')
 
 
 @app.errorhandler(HTTPException)

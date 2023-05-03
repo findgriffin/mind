@@ -12,7 +12,8 @@ from werkzeug.exceptions import HTTPException
 from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase,\
     add_content, setup_logging, update_state, Stuff
 
-app = Flask(__name__, static_url_path="", static_folder="../static")
+app = Flask(__name__, static_url_path="")
+app.secret_key = 'dev'
 app.config.from_object('config')
 
 login_manager = LoginManager(app)

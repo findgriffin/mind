@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}What's the password? {% endblock %}
+{% block description %}You must log in to continue.{% endblock %}
+{% block content %}
+  <form action="/login" method="POST">
+    <h2>What's the password?</h2>
+    <input type="text" name="user" placeholder="you?" id="name" focus required/>
+    <input type="password" name="password" id="password" required/>
+    <input type="submit" value="go!"/>
+  </form>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Goodbye {{ user.id }}? {% endblock %}
+{% block description %} Do you want to log out? {% endblock %}
+{% block content %}
+<form action="/logout" method="POST">
+    <h2>Goodbye {{ user.id }}?</h2>
+    <input type="submit" value="log out"/>
+</form>
+{% endblock %}

@@ -41,6 +41,14 @@
         font-size: .9rem;
         display: inline-block;
     }
+    .greeting {
+        display: inline-block;
+        float: right;
+        margin: 1rem;
+        font-size: 0.9rem;
+        letter-spacing: 0;
+        font-family: "Courier New", monospace;
+    }
     nav {
         display: inline-block;
         float: right;
@@ -190,10 +198,13 @@
 <header>
   <h3>mind</h3>
   <nav>
+    <span> </span>
     <a class="navlink" href="?=#todo">#Packing</a>
     <a class="navlink" href="?=#groceries">#Deals</a>
-  </a>
   </nav>
+  <span class="greeting">
+    What's on your mind <a class="navlink" href="/logout">{{ user.id }}?</a>
+  </span>
 </header>
 <template id="item">
   <li>

@@ -1,14 +1,22 @@
 #!/usr/bin/env python
 import json
 
+from dataclasses import dataclass
+from flask_login import login_user, LoginManager, UserMixin, \
+    login_required, logout_user
 from flask import Flask, jsonify, request, Response, send_file, \
     render_template, make_response, redirect, url_for  # type: ignore
+from typing import Optional
 from werkzeug.exceptions import HTTPException
 
 from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase,\
     add_content, setup_logging, update_state, Stuff
 
 app = Flask(__name__, static_url_path="", static_folder="../static")
+app.config.from_object('config')
+
+login_manager = LoginManager(app)
+login_manager.login_view = 'serve_login'
 
 ADD = 'add'
 NUM = 'num'
@@ -21,6 +29,23 @@ TICK = 'tick'
 UNTICK = 'untick'
 
 
+@dataclass
+class User(UserMixin):
+    id: str
+    password: str
+    salt: str
+
+USERS = {
+    'davo': User(id='davo', password='str1ke', salt='bar')
+}
+
+
+@login_manager.user_loader
+def load_user(user_id) -> Optional[str]:
+    return USERS[user_id] if user_id in USERS else None
+
+
+
 def handle_query(mnd, query):
     order = Order[query[ORDER]] if ORDER in query else Order.LATEST
     page = int(query[PAGE]) if PAGE in query else 1
@@ -31,7 +56,32 @@ def handle_query(mnd, query):
                               state=phase, tag=tag).fetchall(mnd))
 
 
+@app.route('/login', methods=['POST'])
+def handle_login():
+    app.logger.info(f'handling {request.form}')
+    app.logger.info(f'handling {request.form.keys()}')
+    if 'user' in request.form and 'password' in request.form:
+        user_id = request.form['user']
+        if user_id in USERS:
+            user = USERS[user_id]
+            if request.form['password'] == user.password:
+                app.logger.info(f'logging in {user_id}')
+                login_user(user=user, remember=True)
+                return redirect('/')
+    return redirect('error?code=401')
+
+
+@app.get('/login')
+def serve_login():
+    return send_file('../static/login.html')
+
+@app.route('/logout', methods=['POST', 'GET'])
+def logout():
+    logout_user()
+    return redirect('/login')
+
 @app.get('/')
+@login_required
 def serve_index():
     return send_file('../static/index.html')
 
@@ -48,6 +98,7 @@ def handle_errors(error):
 
 
 @app.route('/', methods=['POST'])
+@login_required
 def handle_index():
     mnd = Mind(DEFAULT_DB)
     app.logger.info(f'Processing request: {json.dumps(request.json)}')

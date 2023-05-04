@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}What's the password? {% endblock %}
+{% block description %}You must log in to continue.{% endblock %}
+{% block content %}
+  <form action="/register" method="POST">
+    <h2>Ready to mind your thoughts?</h2>
+    <input type="text" name="user" placeholder="your name" id="name" focus
+           required/>
+    <input type="password" name="password"
+           placeholder="password" id="password" required/>
+    <input type="text" name="token" value={{ token }} hidden/>
+    <input type="submit" value="register me!"/>
+  </form>
+{% endblock %}

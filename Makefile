@@ -44,7 +44,7 @@ run:
 	./run.py
 
 local:
-	./mind/app.py --debug
+	FLASK_ENV=development ./mind/app.py
 
 clean:
 	rm -rf venv

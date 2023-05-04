@@ -193,9 +193,9 @@ def handle_errors(error):
     return redirect(f'error?code={error.code}')
 
 
-@app.route('/', methods=['POST'])
+@app.route('/stuff', methods=['POST'])
 @login_required
-def handle_index():
+def handle_stuff():
     mnd = Mind(DEFAULT_DB)
     app.logger.info(f'Processing request: {json.dumps(request.json)}')
     if QUERY in request.json:

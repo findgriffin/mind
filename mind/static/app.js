@@ -1,9 +1,9 @@
-API = '/'
+STUFF = '/stuff'
 
 COUNTERS = {}
 
 async function getTag(tag) {
-    const resp = await fetch(API, {
+    const resp = await fetch(STUFF, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({'query': {'tag': tag}})
@@ -13,7 +13,7 @@ async function getTag(tag) {
 
 async function doStuff(operation, id, body) {
     console.log(`Doing ${operation} for ${id}`)
-    await fetch(API, {
+    await fetch(STUFF, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({[operation]: {'id': id, 'body': body}})
@@ -22,7 +22,7 @@ async function doStuff(operation, id, body) {
 
 async function addStuff(tag, body) {
     console.log(`For ${tag}, adding ${body}`)
-    const resp = await fetch(API, {
+    const resp = await fetch(STUFF, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({'add': [body, `#${tag}`]})

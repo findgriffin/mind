@@ -90,10 +90,14 @@ def add_token() -> str:
 
 @login_manager.user_loader
 def load_user(user_id) -> Optional[User]:
-    with sqlite3.connect(USERS_DB) as con:
-        cur = con.execute('SELECT * from users where id = ?', (user_id,))
-        row = cur.fetchone()
-        return User(*row) if row else None
+    try:
+        with sqlite3.connect(USERS_DB) as con:
+            cur = con.execute('SELECT * from users where id = ?', (user_id,))
+            row = cur.fetchone()
+            return User(*row) if row else None
+    except Exception as err:
+        app.logger.warning(f'Exception loading user {err}')
+        return None
 
 
 

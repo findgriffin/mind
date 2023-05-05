@@ -68,7 +68,7 @@ def init_db() -> tuple[Connection, bool]:
     con = sqlite3.connect(path or ':memory:')
     if exists:
         row = con.execute('SELECT COUNT(*) FROM users').fetchone()
-        return row[0] == 0
+        return con, row[0] > 0
     else:
         con.execute('CREATE TABLE users('
                     'id TEXT PRIMARY KEY NOT NULL, '

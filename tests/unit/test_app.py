@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 import mind.app
 from mind.app import handle_query, User, handle_login, handle_register, \
-    handle_stuff, load_user, add_token
+    handle_stuff, load_user, add_token, serve_login
 from mind.mind import Mind
 
 
@@ -40,6 +40,10 @@ class TestApp(unittest.TestCase):
     def test_add_token(self):
         with self.app.test_request_context():
             self.assertEqual(64, len(add_token()))
+
+    def test_serve_login(self):
+        with self.app.test_request_context():
+            self.assertTrue(serve_login())
 
     def test_handle_register_success(self):
         with self.app.test_request_context(

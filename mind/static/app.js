@@ -1,14 +1,14 @@
 STUFF = '/stuff'
+TAGS = '/tags'
 
 COUNTERS = {}
 
-async function getTag(tag) {
-    const resp = await fetch(STUFF, {
+async function apiCall(path, query) {
+    return (await fetch(path, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({'query': {'tag': tag}})
-    })
-    return resp.json();
+        body: JSON.stringify(query)
+    })).json()
 }
 
 async function doStuff(operation, id, body) {
@@ -40,7 +40,8 @@ function buildItem(tagName, record) {
     const label = clone.querySelectorAll('label')[0]
     input.id = `${id}-${tagName}-input`
     input.onchange = async (e) =>  {
-        await doStuff(input.checked ? 'tick' : 'untick', record[0], record[1])
+        operation = input.checked ? 'tick' : 'untick'
+        await apiCall(STUFF, {[operation]: {'id': record[0], 'body': record[1]}})
     }
     label.appendChild(document.createTextNode(record[1]));
     label.id = `${id}-${tagName}-label`
@@ -50,9 +51,17 @@ function buildItem(tagName, record) {
     return clone
 }
 
+async function addNavLink(name, href) {
+    const nav = document.getElementById('topnav');
+    const link = document.createElement('a');
+    link.className = 'navlink';
+    link.href=href;
+    link.appendChild(document.createTextNode(name))
+    nav.appendChild(link)
+}
 
 async function addArticle(tagName) {
-    const items = await getTag(tagName);
+    const items = await apiCall(STUFF, {'query': {'tag': tagName}});
     const template = document.getElementById('article');
     const clone = template.content.cloneNode(true);
     const ol = clone.querySelectorAll('ol')[0];
@@ -77,6 +86,9 @@ async function addArticle(tagName) {
 }
 
 window.onload = async (event) => {
-    await addArticle('todo');
-    await addArticle('groceries');
+    const tags_resp = await apiCall(TAGS, {limit: 3});
+    for (const tag of tags_resp) {
+        await addNavLink(`#${tag[1]}`, '/' + tag[1])
+        await addArticle(tag[1]);
+    }
 };

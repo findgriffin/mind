@@ -18,7 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import json
 
 from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase, \
-    add_content, setup_logging, update_state, Stuff
+    add_content, setup_logging, update_state, Stuff, QueryTags
 
 app = Flask(__name__, static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
@@ -209,10 +209,17 @@ def handle_stuff():
         return jsonify({'updated': update_state(stf, mnd, Phase.DONE)})
     elif UNTICK in request.json:
         stf = Stuff(Epoch(request.json[UNTICK]['id']),
-                    request.json[TICK]['body'], state=Phase.DONE)
+                    request.json[UNTICK]['body'], state=Phase.DONE)
         return jsonify({'updated': update_state(stf, mnd, Phase.ACTIVE)})
     else:
         return Response(400)
+
+@app.route('/tags', methods=['POST'])
+@login_required
+def handle_tags():
+    mnd = Mind(DEFAULT_DB)
+    return jsonify(QueryTags(None, limit=3).execute(mnd))
+
 
 
 if __name__ == '__main__':

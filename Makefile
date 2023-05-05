@@ -20,7 +20,7 @@ style:
 	flake8 mind tests
 
 types:
-	mypy mind
+	mypy mind --ignore-missing-imports
 
 test:
 	coverage run --source mind -m unittest discover -s tests/unit

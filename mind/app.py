@@ -2,13 +2,14 @@
 import os
 import secrets
 from dataclasses import dataclass
-from sqlite3 import Connection, IntegrityError
+from sqlite3 import IntegrityError
 
 import sqlite3
+# type: ignore
 from flask_login import login_user, LoginManager, UserMixin, \
     login_required, logout_user, current_user, encode_cookie, decode_cookie
 from flask import Flask, jsonify, request, Response, send_file, \
-    render_template, make_response, redirect, url_for  # type: ignore
+    render_template, redirect  # type: ignore
 from typing import Optional
 
 from pathlib import Path
@@ -17,8 +18,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 import json
 
-from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, Phase, \
-    add_content, setup_logging, update_state, Stuff, QueryTags
+from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, \
+    Phase, add_content, setup_logging, update_state, Stuff, QueryTags
 
 app = Flask(__name__, static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
@@ -48,7 +49,6 @@ class User(UserMixin):
     def create(cls, name: str, password: str):
         hash = generate_password_hash(password)
         return cls(name, hash)
-
 
 
 def init_db() -> bool:
@@ -81,6 +81,7 @@ def add_user(user: User, token: Optional[str]) -> bool:
             app.logger.warning(f'User {user.id} already exists.')
             return False
 
+
 def add_token() -> str:
     with sqlite3.connect(USERS_DB) as con:
         token = secrets.token_hex()
@@ -98,7 +99,6 @@ def load_user(user_id) -> Optional[User]:
     except Exception as err:
         app.logger.warning(f'Exception loading user {err}')
         return None
-
 
 
 def handle_query(mnd, query):
@@ -135,29 +135,33 @@ def serve_login():
         else:
             return render_template('login.html')
 
+
 @app.get('/logout')
 @login_required
 def serve_logout():
     return render_template('logout.html', user=current_user)
+
 
 @app.route('/logout', methods=['POST'])
 def logout():
     logout_user()
     return redirect('/login')
 
+
 @app.get('/register')
 @login_required
 def serve_add_user():
     return redirect(f'/register/{encode_cookie(add_token())}')
+
 
 @app.get('/register/<token>')
 def serve_register(token):
     app.logger.info(f'Registering token: {token}')
     return render_template('register.html', token=token)
 
+
 @app.route('/register', methods=['POST'])
 def handle_register():
-    app.logger.info(f'Handling')
     if all(key in request.form for key in ['user', 'token', 'password']):
         user_name = request.form['user']
         token = request.form['token']
@@ -174,7 +178,8 @@ def handle_register():
             app.logger.info('could not decode cookie')
     else:
         app.logger.warning('Missing field')
-    return redirect(f'error?code=401')
+    return redirect('error?code=401')
+
 
 @app.get('/')
 @login_required
@@ -214,12 +219,12 @@ def handle_stuff():
     else:
         return Response(400)
 
+
 @app.route('/tags', methods=['POST'])
 @login_required
 def handle_tags():
     mnd = Mind(DEFAULT_DB)
     return jsonify(QueryTags(None, limit=3).execute(mnd))
-
 
 
 if __name__ == '__main__':

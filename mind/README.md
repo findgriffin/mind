@@ -17,6 +17,23 @@
     purge?      FORGOTEN(2)     -> BLANK(-1)
 ```
 
+## Dealing with Integrity Errors
+These shouldn't happen if everything is transactional.
+
+A potential solution is to delete the latest entry in the log. If the error
+is occurring on the latest entry in the log, you can try to delete it.
+
+First, make a backup copy of the db.
+
+To get the latest log entry:
+```sql
+SELECT * FROM log ORDER BY sn DESC LIMIT 1;
+```
+To delete it:
+```sql
+DELETE FROM log WHERE sn = {num};
+```
+
 
 ## SQLite things
 

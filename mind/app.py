@@ -169,7 +169,7 @@ def handle_register():
                 login_user(new_user, remember=True)
                 return redirect('/')
             else:
-                return redirect('/login?msg=')
+                return redirect('/error?code=409')
         else:
             app.logger.info('could not decode cookie')
     else:

@@ -2,7 +2,7 @@
 import os
 import secrets
 from dataclasses import dataclass
-from sqlite3 import IntegrityError
+from sqlite3 import IntegrityError, Connection
 
 import sqlite3
 # type: ignore
@@ -21,7 +21,12 @@ import json
 from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, \
     Phase, add_content, setup_logging, update_state, Stuff, QueryTags
 
-app = Flask(__name__, static_url_path='')
+
+def create_app():
+    return Flask(__name__, static_url_path='')
+
+
+app = create_app()
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
 
 login_manager = LoginManager(app)
@@ -51,26 +56,36 @@ class User(UserMixin):
         return cls(name, hash)
 
 
-def init_db() -> bool:
+def init_db() -> tuple[Connection, bool]:
     """Returns True if the DB was initialized."""
-    path = Path(USERS_DB).expanduser()
-    exists = path.exists() and path.stat().st_size
-    app.logger.debug(f"Opening DB {path}, exists: {path.exists()}")
-    with sqlite3.connect(path) as con:
-        if exists:
-            row = con.execute('SELECT COUNT(*) FROM users').fetchone()
-            return row[0] == 0
-        else:
-            con.execute('CREATE TABLE users('
-                        'id TEXT PRIMARY KEY NOT NULL, '
-                        'secret TEXT NOT NULL)')
-            con.execute('CREATE TABLE tokens(token TEXT PRIMARY KEY NOT NULL)')
-            con.commit()
-    return not exists
+    path: Optional[Path] = None
+    if app.config.get('TESTING', False):
+        exists = False
+    else:
+        path = Path(USERS_DB).expanduser()
+        exists = path.exists() and path.stat().st_size > 0
+        app.logger.debug(f"Opening DB {path}, exists: {path.exists()}")
+    con = sqlite3.connect(path or ':memory:')
+    if exists:
+        row = con.execute('SELECT COUNT(*) FROM users').fetchone()
+        return row[0] == 0
+    else:
+        con.execute('CREATE TABLE users('
+                    'id TEXT PRIMARY KEY NOT NULL, '
+                    'secret TEXT NOT NULL)')
+        con.execute('CREATE TABLE tokens(token TEXT PRIMARY KEY NOT NULL)')
+        con.commit()
+    return con, exists
+
+
+def get_db() -> Connection:
+    path = ':memory:' if app.config.get('TESTING', False) else USERS_DB
+    return sqlite3.connect(path)
 
 
 def add_user(user: User, token: Optional[str]) -> bool:
-    with sqlite3.connect(USERS_DB) as con:
+    con, exists = init_db()
+    with con:
         try:
             con.execute('INSERT INTO users (id, secret) VALUES (?, ?)',
                         (user.id, user.secret))
@@ -83,16 +98,22 @@ def add_user(user: User, token: Optional[str]) -> bool:
 
 
 def add_token() -> str:
-    with sqlite3.connect(USERS_DB) as con:
+    con, exists = init_db()
+    with con:
         token = secrets.token_hex()
         con.execute('INSERT INTO tokens (token) VALUES (?)', (token,))
         return token
 
 
+def init_mind() -> Mind:
+    return Mind(':memory:' if app.config.get('TESTING', False) else DEFAULT_DB)
+
+
 @login_manager.user_loader
 def load_user(user_id) -> Optional[User]:
     try:
-        with sqlite3.connect(USERS_DB) as con:
+        con, exists = init_db()
+        with con:
             cur = con.execute('SELECT * from users where id = ?', (user_id,))
             row = cur.fetchone()
             return User(*row) if row else None
@@ -127,13 +148,14 @@ def handle_login():
 
 @app.get('/login')
 def serve_login():
-    if init_db():
-        return redirect(f'/register/{encode_cookie(add_token())}')
-    else:
+    con, exists = init_db()
+    if exists:
         if current_user.is_authenticated:
             return redirect('/logout')
         else:
             return render_template('login.html')
+    else:
+        return redirect(f'/register/{encode_cookie(add_token())}')
 
 
 @app.get('/logout')
@@ -201,7 +223,7 @@ def handle_errors(error):
 @app.route('/stuff', methods=['POST'])
 @login_required
 def handle_stuff():
-    mnd = Mind(DEFAULT_DB)
+    mnd = init_mind()
     app.logger.info(f'Processing request: {json.dumps(request.json)}')
     if QUERY in request.json:
         return handle_query(mnd, request.json[QUERY])
@@ -223,8 +245,7 @@ def handle_stuff():
 @app.route('/tags', methods=['POST'])
 @login_required
 def handle_tags():
-    mnd = Mind(DEFAULT_DB)
-    return jsonify(QueryTags(None, limit=3).execute(mnd))
+    return jsonify(QueryTags(None, limit=3).execute(init_mind()))
 
 
 if __name__ == '__main__':

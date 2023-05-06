@@ -50,6 +50,9 @@ function linkEnterKey(input, button) {
 
 async function addArticle(tagName) {
     const items = await apiCall(STUFF, {'query': {'tag': tagName}});
+    if (items.length === 0) {
+        return false;
+    }
     const template = document.getElementById('article');
     const clone = template.content.cloneNode(true);
     const ol = clone.querySelectorAll('ol')[0];
@@ -74,21 +77,30 @@ async function addArticle(tagName) {
     for (const [i, item] of items.entries()) {
         ol.appendChild(buildItem(tagName, item))
     }
+    return true;
 }
 
 window.onload = async (event) => {
-    const tags_resp = await apiCall(TAGS, {limit: 3});
+    const tags_resp = await apiCall(TAGS, {limit: 4});
     const add = document.getElementById('add-stuff-input')
     const add_btn = document.getElementById('add-stuff-btn')
+    linkEnterKey(add, add_btn);
     add_btn.onclick = async (e) =>  {
         added = await apiCall(STUFF, {'add': [add.value]})
         tags = added.tags // In theory there could be more tags.
         add.value = ''
+        location.reload();
         add.focus()
     }
+    let articles = false;
     for (const tag of tags_resp) {
         await addTagLink(tag[1])
-        await addArticle(tag[1]);
+        if (await addArticle(tag[1])) {
+          articles = true;
+        }
     }
     await addTagLink(null);
+    if (!articles) {
+        document.getElementById('placeholder').hidden = false;
+    }
 };

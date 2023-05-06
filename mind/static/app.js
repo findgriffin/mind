@@ -11,16 +11,6 @@ async function apiCall(path, query) {
     })).json()
 }
 
-async function addStuff(tag, body) {
-    const resp = await fetch(STUFF, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({'add': [body, tag ? `#${tag}` : '']})
-    });
-    const resp_json = await resp.json()
-    return resp_json
-}
-
 function buildItem(tagName, record) {
     id = COUNTERS[tagName]
     const template = document.getElementById('item');
@@ -62,7 +52,8 @@ async function addArticle(tagName) {
     add_btn.id = `add-${tagName}-btn`;
     add_btn.appendChild(document.createTextNode(`add to #${tagName}`))
     add_btn.onclick = async (e) =>  {
-        added = await addStuff(tagName, add.value);
+        const added = await apiCall(
+            STUFF, {'add': [add.value, `#${tagName}`]})
         tags = added.tags // In theory there could be more tags.
         ol.insertBefore(buildItem(tagName, added.stuff), ol.firstChild);
         add.value = ''
@@ -87,7 +78,7 @@ window.onload = async (event) => {
         }
     });
     add_btn.onclick = async (e) =>  {
-        added = await addStuff(null, add.value);
+        added = await apiCall(STUFF, {'add': [add.value]})
         tags = added.tags // In theory there could be more tags.
         add.value = ''
         add.focus()

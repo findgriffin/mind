@@ -34,28 +34,37 @@
         background: var(--dark);
         color: var(--accent);
         letter-spacing: 0.2em;
-        margin: 0 1rem;
+        margin: 0 1rem 1rem 1rem;
+        display: grid;
+        align-items: center;
+        /**
+         * From CSS Tricks:
+         * https://css-tricks.com/an-auto-filling-css-grid-with-max-columns/
+         */
+        --grid-layout-gap: 0.5rem;
+        --grid-column-count: 2;
+        --grid-item--min-width: 300px;
+        --gap-count: calc(var(--grid-column-count) - 1);
+        --total-gap-width: calc(var(--gap-count) * var(--grid-layout-gap));
+        --grid-item--max-width: calc((100% - var(--total-gap-width)) / var(--grid-column-count));
+        grid-template-columns: repeat(auto-fill, minmax(max(var(--grid-item--min-width), var(--grid-item--max-width)), 1fr));
+        gap: var(--grid-layout-gap);
     }
     h3 {
-        margin: 1rem;
         font-size: .9rem;
-        display: inline-block;
     }
     .greeting {
-        display: inline-block;
-        margin: 0 0.2rem;
+        margin: 0;
         font-size: 0.9rem;
         letter-spacing: 0;
         font-family: "Courier New", monospace;
     }
     nav {
-        display: inline-block;
-        float: right;
-        margin: 1rem;
+        text-align: right;
     }
     .navlink {
         color: var(--light);
-        margin: 0 0.3rem;
+        margin: 0 0.2rem;
         font-size: .9rem;
         letter-spacing: 0;
         text-transform: none;
@@ -114,7 +123,6 @@
     button {
         margin: 0 0 0 0.5rem;
         height: 1.5rem;
-        width: 3rem;
         background: var(--accent);
         color: var(--dark);
         border-radius: 4px;
@@ -198,9 +206,15 @@
 <header>
   <h3>mind</h3>
   <nav id="topnav">
-    <span class="greeting">
-      What's on your mind
-    </span><a class="navlink" href="/logout">{{ user.id }}?</a></nav>
+  <span class="greeting">
+    What's on your mind
+  </span><a class="navlink" href="/logout">{{ user.id }}?</a></nav>
+  <div>
+    <input type="text" name='add' id="add-stuff-input" placeholder="Add stuff...">
+    <button id="add-stuff-btn">add</button>
+  </div>
+  <nav id="latest-tags">
+  </nav>
 </header>
 <template id="item">
   <li>
@@ -212,7 +226,7 @@
   <article>
     <h4></h4>
     <input type="text" name='add' placeholder="Add stuff...">
-    <button>add</button>
+    <button></button>
     <ol></ol>
   </article>
 </template>

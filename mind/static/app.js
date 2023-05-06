@@ -11,24 +11,13 @@ async function apiCall(path, query) {
     })).json()
 }
 
-async function doStuff(operation, id, body) {
-    console.log(`Doing ${operation} for ${id}`)
-    await fetch(STUFF, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({[operation]: {'id': id, 'body': body}})
-    })
-}
-
 async function addStuff(tag, body) {
-    console.log(`For ${tag}, adding ${body}`)
     const resp = await fetch(STUFF, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({'add': [body, `#${tag}`]})
+        body: JSON.stringify({'add': [body, tag ? `#${tag}` : '']})
     });
     const resp_json = await resp.json()
-    console.log(resp_json)
     return resp_json
 }
 
@@ -51,14 +40,15 @@ function buildItem(tagName, record) {
     return clone
 }
 
-async function addNavLink(name, href) {
-    const nav = document.getElementById('topnav');
-    const link = document.createElement('a');
+function addTagLink(tag) {
+    const latest_list = document.getElementById('latest-tags')
+    const link = document.createElement('a')
+    link.href = tag ? `/tags/${tag}` : '/tags'
     link.className = 'navlink';
-    link.href=href;
-    link.appendChild(document.createTextNode(name))
-    nav.appendChild(link)
+    link.appendChild(document.createTextNode(tag ? `#${tag}` : '[all]'))
+    latest_list.appendChild(link)
 }
+
 
 async function addArticle(tagName) {
     const items = await apiCall(STUFF, {'query': {'tag': tagName}});
@@ -70,6 +60,7 @@ async function addArticle(tagName) {
     const add_btn = clone.querySelectorAll('button')[0];
     add.id = `add-${tagName}`;
     add_btn.id = `add-${tagName}-btn`;
+    add_btn.appendChild(document.createTextNode(`add to #${tagName}`))
     add_btn.onclick = async (e) =>  {
         added = await addStuff(tagName, add.value);
         tags = added.tags // In theory there could be more tags.
@@ -87,8 +78,23 @@ async function addArticle(tagName) {
 
 window.onload = async (event) => {
     const tags_resp = await apiCall(TAGS, {limit: 3});
+    const add = document.getElementById('add-stuff-input')
+    const add_btn = document.getElementById('add-stuff-btn')
+    add.addEventListener("keypress", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            add_btn.click()
+        }
+    });
+    add_btn.onclick = async (e) =>  {
+        added = await addStuff(null, add.value);
+        tags = added.tags // In theory there could be more tags.
+        add.value = ''
+        add.focus()
+    }
     for (const tag of tags_resp) {
-        await addNavLink(`#${tag[1]}`, '/' + tag[1])
+        await addTagLink(tag[1])
         await addArticle(tag[1]);
     }
+    await addTagLink(null);
 };

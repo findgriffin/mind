@@ -39,6 +39,14 @@ function addTagLink(tag) {
     latest_list.appendChild(link)
 }
 
+function linkEnterKey(input, button) {
+    input.addEventListener("keypress", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            button.click()
+        }
+    });
+}
 
 async function addArticle(tagName) {
     const items = await apiCall(STUFF, {'query': {'tag': tagName}});
@@ -51,6 +59,7 @@ async function addArticle(tagName) {
     add.id = `add-${tagName}`;
     add_btn.id = `add-${tagName}-btn`;
     add_btn.appendChild(document.createTextNode(`add to #${tagName}`))
+    linkEnterKey(add, add_btn);
     add_btn.onclick = async (e) =>  {
         const added = await apiCall(
             STUFF, {'add': [add.value, `#${tagName}`]})
@@ -71,12 +80,6 @@ window.onload = async (event) => {
     const tags_resp = await apiCall(TAGS, {limit: 3});
     const add = document.getElementById('add-stuff-input')
     const add_btn = document.getElementById('add-stuff-btn')
-    add.addEventListener("keypress", (event) => {
-        if (event.key === "Enter") {
-            event.preventDefault();
-            add_btn.click()
-        }
-    });
     add_btn.onclick = async (e) =>  {
         added = await apiCall(STUFF, {'add': [add.value]})
         tags = added.tags // In theory there could be more tags.

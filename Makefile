@@ -8,13 +8,15 @@ PYTHON=python3.10
 clean:
 	rm -rf build
 
-build: clean install style types test
+build/$(APP)-$(ENV).zip: clean install style types test mind
 	mkdir -p build/site-packages
 	zip -r build/$(APP)-$(ENV).zip $(APP) -x "*__pycache__*"
 	pip install -r $(APP)/requirements.txt -t build/site-packages
 	cd build/site-packages; zip -g -r ../$(APP)-$(ENV).zip . -x "*__pycache__*"
 
-deploy: build
+build: build/$(APP)-$(ENV).zip
+
+deploy: build/$(APP)-$(ENV).zip
 	envchain $(ENVCHAIN) aws lambda update-function-code \
 		--region=$(REGION) \
 		--function-name $(FUNCTION) \

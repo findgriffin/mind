@@ -35,7 +35,7 @@ activate.sh:
 	echo ". ./venv/bin/activate" >> activate.sh
 	chmod +x activate.sh
 	
-install: venv venv/pip.log activate.sh
+install: venv venv/pip.log
 
 activate:
 	set -a && ./activate.sh && set +a

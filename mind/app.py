@@ -47,7 +47,7 @@ UNTICK = 'untick'
 
 @dataclass
 class User(UserMixin):
-    id: int
+    id: str
     secret: str
 
     @classmethod

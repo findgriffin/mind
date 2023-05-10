@@ -1,10 +1,31 @@
+FUNCTION=mind-prod
+REGION = us-west-2
+ENVCHAIN = findgriffin
+APP=mind
+ENV=prod
+PYTHON=python3.10
 
-build: style types test
+clean:
+	rm -rf build
+
+build: clean install style types test
+	mkdir -p build/site-packages
+	zip -r build/$(APP)-$(ENV).zip $(APP) -x "*__pycache__*"
+	pip install -r $(APP)/requirements.txt -t build/site-packages
+	cd build/site-packages; zip -g -r ../$(APP)-$(ENV).zip . -x "*__pycache__*"
+
+deploy: build
+	envchain $(ENVCHAIN) aws lambda update-function-code \
+		--region=$(REGION) \
+		--function-name $(FUNCTION) \
+		--zip-file fileb://build/$(FUNCTION).zip \
+		--publish
+
 
 venv:
 	python3 -m venv venv
 
-venv/pip.log: requirements.txt
+venv/pip.log: requirements.txt venv
 	pip3 install -r requirements.txt > venv/pip.log
 
 activate.sh:
@@ -22,7 +43,7 @@ style:
 types:
 	mypy mind --ignore-missing-imports
 
-test:
+test: install
 	coverage run --source mind -m unittest discover -s tests/unit
 	coverage html
 	coverage report --fail-under=90
@@ -30,7 +51,7 @@ test:
 perf:
 	python -m unittest discover -s tests/perf
 
-deploy:	build git-clean
+push: build git-clean
 	git push
 	
 git-clean:
@@ -46,7 +67,7 @@ run:
 local:
 	FLASK_ENV=development ./mind/app.py
 
-clean:
+full-clean:	clean
 	rm -rf venv
 	rm -rf **/__pycache__
 	rm -rf **/*.pyc

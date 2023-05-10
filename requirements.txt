@@ -1,9 +1,9 @@
 mypy
 flake8
 coverage
-flask
-flask-login
 
 # For import_evernote.py script
 lxml
 markdownify
+
+-r mind/requirements.txt

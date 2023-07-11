@@ -29,7 +29,7 @@ deploy: build/$(APP)-$(ENV).zip
 venv:
 	python3 -m venv venv
 
-venv/pip.log: requirements.txt venv
+venv/pip.log: requirements.txt mind/requirements.txt venv
 	pip3 install -r requirements.txt > venv/pip.log
 
 activate.sh:

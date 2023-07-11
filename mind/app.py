@@ -6,7 +6,7 @@ from sqlite3 import IntegrityError, Connection
 
 import sqlite3
 
-from flask_lambda import FlaskLambda
+from lib.davos_flask_lambda import FlaskLambda
 # type: ignore
 from flask_login import login_user, LoginManager, UserMixin, \
     login_required, logout_user, current_user, encode_cookie, decode_cookie

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from sqlite3 import IntegrityError, Connection
 
 import sqlite3
+
+from flask_lambda import FlaskLambda
 # type: ignore
 from flask_login import login_user, LoginManager, UserMixin, \
     login_required, logout_user, current_user, encode_cookie, decode_cookie
@@ -22,11 +24,14 @@ from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, \
     Phase, add_content, setup_logging, update_state, Stuff, QueryTags
 
 
-def create_app():
-    return Flask(__name__, static_url_path='')
+def create_app(flask_env: str):
+    if flask_env == 'development':
+        return Flask(__name__, static_url_path='')
+    else:
+        return FlaskLambda(__name__, static_url_path='')
 
 
-app = create_app()
+app = create_app(os.environ.get('FLASK_ENV', default='production'))
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key')
 
 login_manager = LoginManager(app)

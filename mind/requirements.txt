@@ -1,3 +1,6 @@
 flask
 flask-login
 flask-lambda
+
+# Workaround for: https://github.com/sivel/flask-lambda/pull/14
+werkzeug=2.0.3

@@ -4,6 +4,7 @@ ENVCHAIN = findgriffin
 APP=mind
 ENV=prod
 PYTHON=python3.10
+LIBRARIES=lib
 
 clean:
 	rm -rf build
@@ -11,6 +12,7 @@ clean:
 build/$(APP)-$(ENV).zip: clean install style types test mind
 	mkdir -p build/site-packages
 	zip -r build/$(APP)-$(ENV).zip $(APP) -x "*__pycache__*"
+	zip -r build/$(APP)-$(ENV).zip $(LIBRARIES) -x "*__pycache__*"
 	pip install -r $(APP)/requirements.txt -t build/site-packages
 	cd build/site-packages; zip -g -r ../$(APP)-$(ENV).zip . -x "*__pycache__*"
 

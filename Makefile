@@ -5,6 +5,7 @@ APP=mind
 ENV=prod
 PYTHON=python3.10
 LIBRARIES=lib
+FUNCTION_URL="https://2lzl5j3eoqpgqzl2avqcqtkygi0uwfkh.lambda-url.us-west-2.on.aws/"
 
 clean:
 	rm -rf build
@@ -75,3 +76,9 @@ full-clean:	clean
 	rm -rf venv
 	rm -rf **/__pycache__
 	rm -rf **/*.pyc
+
+check_prod:
+	envchain findgriffin aws --region=us-west-2 lambda get-function --function-name mind-prod | jq '.Configuation.State'
+
+test_prod:
+	curl -v -X POST "$FUNCTION_URL" -H 'X-Forwarded-Proto: https' -H 'content-type: application/json' -d '{ "example": "test" }'

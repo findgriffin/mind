@@ -20,6 +20,7 @@ import sys
 from io import StringIO
 from urllib.parse import urlencode
 
+import traceback
 from flask import Flask
 try:  # werkzeug <= 2.0.3
     from werkzeug.wrappers import BaseRequest
@@ -75,6 +76,7 @@ def make_environ(event):
     environ['wsgi.run_once'] = True
     environ['wsgi.multiprocess'] = False
 
+    print(f'built environ: {environ}')
     BaseRequest(environ)
 
     return environ
@@ -118,6 +120,7 @@ class FlaskLambda(Flask):
 
         except Exception as e:
             print('unexpected error', e)
+            traceback.print_exception(*sys.exc_info())
             return {
                 'statusCode': 500,
                 'headers': {},

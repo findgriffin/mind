@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 import traceback
 from flask import Flask
 try:  # werkzeug <= 2.0.3
-    from werkzeug.wrappers import BaseRequest
+    from werkzeug.wrappers import BaseRequest  # type: ignore
 except ImportError:  # werkzeug > 2.1
     from werkzeug.wrappers import Request as BaseRequest  # type: ignore
 
@@ -81,6 +81,52 @@ def make_environ(event):
 
     return environ
 
+def environ_from_function_url(event):
+    environ = {}
+    context = event['requestContext']
+    headers = event.get('headers', {}) or {}
+    for hdr_name, hdr_value in headers.items():
+        hdr_name = hdr_name.replace('-', '_').upper()
+        if hdr_name in ['CONTENT_TYPE', 'CONTENT_LENGTH']:
+            environ[hdr_name] = hdr_value
+            continue
+
+        http_hdr_name = 'HTTP_{}'.format(hdr_name)
+        environ[http_hdr_name] = hdr_value
+
+    environ['REQUEST_METHOD'] = context['http']['method']
+    environ['PATH_INFO'] = context['http']['path']
+    qs = '' # TODO
+    environ['QUERY_STRING'] = urlencode(qs) if qs else ''
+
+    environ['REMOTE_ADDR'] = environ.get('X_FORWARDED_FOR')
+
+    environ['HOST'] = '{}:{}'.format(
+        environ.get('HTTP_HOST', ''),
+        environ.get('HTTP_X_FORWARDED_PORT', ''),
+    )
+    environ['SCRIPT_NAME'] = ''
+    environ['SERVER_NAME'] = 'SERVER_NAME'
+
+    environ['SERVER_PORT'] = environ.get('HTTP_X_FORWARDED_PORT', '')
+    environ['SERVER_PROTOCOL'] = 'HTTP/1.1'
+
+    environ['CONTENT_LENGTH'] = str(
+        len(event['body']) if event['body'] else ''
+    )
+
+    environ['wsgi.url_scheme'] = environ.get('HTTP_X_FORWARDED_PROTO', 'https')
+    environ['wsgi.input'] = StringIO(event['body'] or '')
+    environ['wsgi.version'] = (1, 0)
+    environ['wsgi.errors'] = sys.stderr
+    environ['wsgi.multithread'] = False
+    environ['wsgi.run_once'] = True
+    environ['wsgi.multiprocess'] = False
+
+    print(f'built environ: {environ}')
+    BaseRequest(environ)
+
+    return environ
 
 class LambdaResponse(object):
 
@@ -96,8 +142,22 @@ class LambdaResponse(object):
 class FlaskLambda(Flask):
 
     def __call__(self, event, context):
+        print(event)
+        print(context)
         try:
-            if 'httpMethod' not in event:
+            if 'requestContext' in event and 'http' in event['requestContext']:
+                print('call as function URL')
+                response = LambdaResponse()
+                body = next(self.wsgi_app(
+                    environ_from_function_url(event),
+                    response.start_response
+                ))
+                return {
+                    'statusCode': response.status,
+                    'headers': response.response_headers,
+                    'body': body.decode('utf-8')
+                }
+            elif 'httpMethod' not in event:
                 print('call as flask app')
                 # In this "context" `event` is `environ` and
                 # `context` is `start_response`, meaning the request didn't

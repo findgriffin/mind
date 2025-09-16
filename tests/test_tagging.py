@@ -7,7 +7,7 @@ class TestTagging(unittest.TestCase):
 
     def test_tag_set(self):
         # Given
-        tags = [mind.Tag(1, "one"), mind.Tag(1, "two")]
+        tags = [mind.Tag(mind.Epoch(1), "one"), mind.Tag(mind.Epoch(1), "two")]
         # When
         output = mind.canonical_tags(tags)
         # Then
@@ -29,7 +29,6 @@ class TestTagging(unittest.TestCase):
         output, tags = mind.extract_tags(raw)
         # Then
         self.assertEqual(output, "one two")
-        set
         self.assertSetEqual(tags, {"three"})
 
     def test_extract_multiple_tags(self):

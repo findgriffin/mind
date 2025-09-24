@@ -1,5 +1,5 @@
 from argparse import Namespace
-from datetime import datetime
+from datetime import datetime, UTC
 
 from contextlib import redirect_stdout
 
@@ -48,7 +48,7 @@ class TestSQLite(unittest.TestCase):
         fetched = QueryStuff().fetchall(self.sesh)
         # Then
         self.assertEqual(fetched[0][1], "one")
-        now = datetime.utcnow().timestamp()
+        now = datetime.now(UTC).timestamp()
         # Note: from https://docs.python.org/3/library/datetime.html
         #  > This does not support parsing arbitrary ISO 8601 strings
         #  > - it is only intended as the inverse operation of

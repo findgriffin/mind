@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import secrets
+from contextlib import closing
 from dataclasses import dataclass
 from sqlite3 import IntegrityError, Connection
 
@@ -18,8 +19,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 import json
 
-from mind import DEFAULT_DB, Epoch, QueryStuff, Mind, Order, PAGE_SIZE, \
-    Phase, add_content, setup_logging, update_state, Stuff, QueryTags
+from mind import DEFAULT_DB, Epoch, QueryStuff, MEMORY, Mind, Order, \
+    PAGE_SIZE, Phase, add_content, setup_logging, update_state, Stuff, \
+    QueryTags
 
 
 def create_app():
@@ -56,64 +58,67 @@ class User(UserMixin):
         return cls(name, hash)
 
 
-def init_db() -> tuple[Connection, bool]:
-    """Returns True if the DB was initialized."""
-    path: Optional[Path] = None
+def users_db_exists() -> bool:
+    path: Path | str
     if app.config.get('TESTING', False):
+        path = ':memory:'
         exists = False
     else:
         path = Path(USERS_DB).expanduser()
         exists = path.exists() and path.stat().st_size > 0
-        app.logger.debug(f"Opening DB {path}, exists: {path.exists()}")
-    con = sqlite3.connect(path or ':memory:')
-    if exists:
-        row = con.execute('SELECT COUNT(*) FROM users').fetchone()
-        return con, row[0] > 0
-    else:
-        con.execute('CREATE TABLE users('
-                    'id TEXT PRIMARY KEY NOT NULL, '
-                    'secret TEXT NOT NULL)')
-        con.execute('CREATE TABLE tokens(token TEXT PRIMARY KEY NOT NULL)')
-        con.commit()
-    return con, exists
+    app.logger.debug(f"Opening DB {path}, exists: {exists}")
+    return exists
 
 
-def get_db() -> Connection:
+def users_db() -> Connection:
     path = ':memory:' if app.config.get('TESTING', False) else USERS_DB
     return sqlite3.connect(path)
 
 
+def init_users_db(conn: Connection) -> bool:
+    """Returns True if the DB was initialized."""
+    # https://stackoverflow.com/questions/58471206/does-connection-exit-close-itself-in-sqlite3
+    if users_db_exists():
+        row = conn.execute('SELECT COUNT(*) FROM users').fetchone()
+        return row[0] > 0
+    else:
+        conn.execute('CREATE TABLE users(id TEXT PRIMARY KEY NOT NULL, '
+                     'secret TEXT NOT NULL)')
+        conn.execute('CREATE TABLE tokens(token TEXT PRIMARY KEY NOT NULL)')
+        conn.commit()
+        return False
+
+
 def add_user(user: User, token: Optional[str]) -> bool:
-    con, exists = init_db()
-    with con:
-        try:
+    try:
+        with closing(users_db()) as con:
+            init_users_db(con)
             con.execute('INSERT INTO users (id, secret) VALUES (?, ?)',
                         (user.id, user.secret))
             if token:
                 con.execute('DELETE FROM tokens WHERE token = ?', (token,))
             return True
-        except IntegrityError:
-            app.logger.warning(f'User {user.id} already exists.')
-            return False
+    except IntegrityError:
+        app.logger.warning(f'User {user.id} already exists.')
+        return False
 
 
 def add_token() -> str:
-    con, exists = init_db()
-    with con:
+    with closing(users_db()) as con:
+        init_users_db(con)
         token = secrets.token_hex()
         con.execute('INSERT INTO tokens (token) VALUES (?)', (token,))
         return token
 
 
 def init_mind() -> Mind:
-    return Mind(':memory:' if app.config.get('TESTING', False) else DEFAULT_DB)
+    return Mind(MEMORY if app.config.get('TESTING', False) else DEFAULT_DB)
 
 
 @login_manager.user_loader
 def load_user(user_id) -> Optional[User]:
     try:
-        con, exists = init_db()
-        with con:
+        with closing(users_db()) as con:
             cur = con.execute('SELECT * from users where id = ?', (user_id,))
             row = cur.fetchone()
             return User(*row) if row else None
@@ -148,14 +153,15 @@ def handle_login():
 
 @app.get('/login')
 def serve_login():
-    con, exists = init_db()
-    if exists:
-        if current_user.is_authenticated:
-            return redirect('/logout')
+    with closing(users_db()) as con:
+        exists = init_users_db(con)
+        if exists:
+            if current_user.is_authenticated:
+                return redirect('/logout')
+            else:
+                return render_template('login.html')
         else:
-            return render_template('login.html')
-    else:
-        return redirect(f'/register/{encode_cookie(add_token())}')
+            return redirect(f'/register/{encode_cookie(add_token())}')
 
 
 @app.get('/logout')
@@ -223,23 +229,23 @@ def handle_errors(error):
 @app.route('/stuff', methods=['POST'])
 @login_required
 def handle_stuff():
-    mnd = init_mind()
-    app.logger.info(f'Processing request: {json.dumps(request.json)}')
-    if QUERY in request.json:
-        return handle_query(mnd, request.json[QUERY])
-    elif ADD in request.json:
-        stuff, tags = add_content(mnd, request.json[ADD])
-        return jsonify({'tags': [t.tag for t in tags], 'stuff': stuff})
-    elif TICK in request.json:
-        stf = Stuff(Epoch(request.json[TICK]['id']),
-                    request.json[TICK]['body'], state=Phase.ACTIVE)
-        return jsonify({'updated': update_state(stf, mnd, Phase.DONE)})
-    elif UNTICK in request.json:
-        stf = Stuff(Epoch(request.json[UNTICK]['id']),
-                    request.json[UNTICK]['body'], state=Phase.DONE)
-        return jsonify({'updated': update_state(stf, mnd, Phase.ACTIVE)})
-    else:
-        return Response(400)
+    with init_mind() as mnd:
+        app.logger.info(f'Processing request: {json.dumps(request.json)}')
+        if QUERY in request.json:
+            return handle_query(mnd, request.json[QUERY])
+        elif ADD in request.json:
+            stuff, tags = add_content(mnd, request.json[ADD])
+            return jsonify({'tags': [t.tag for t in tags], 'stuff': stuff})
+        elif TICK in request.json:
+            stf = Stuff(Epoch(request.json[TICK]['id']),
+                        request.json[TICK]['body'], state=Phase.ACTIVE)
+            return jsonify({'updated': update_state(stf, mnd, Phase.DONE)})
+        elif UNTICK in request.json:
+            stf = Stuff(Epoch(request.json[UNTICK]['id']),
+                        request.json[UNTICK]['body'], state=Phase.DONE)
+            return jsonify({'updated': update_state(stf, mnd, Phase.ACTIVE)})
+        else:
+            return Response(400)
 
 
 @app.route('/tags', methods=['POST'])

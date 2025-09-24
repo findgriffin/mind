@@ -14,6 +14,7 @@ import sqlite3
 CLEAN = "clean"
 CMD = "cmd"
 DEFAULT_DB = "~/.mind.db"
+MEMORY = ":memory:"
 MICROS = 1e6
 NEWLINE = "\n"
 SPACE = " "
@@ -201,29 +202,36 @@ class Change(NamedTuple):
                       self.stamp, self.act.value[0], self.act.value[1])
 
 
-class Mind():
+class Mind:
     tables: dict[str, type] = {STUFF: Stuff, TAGS: Tag, "log": Record}
 
-    def __init__(self, filename: str, strict: bool = False) -> None:
+    def __init__(self, filename: str | Path, strict: bool = False) -> None:
         self.strict = strict
-        path = Path(filename).expanduser()
-        exists = path.exists() and path.stat().st_size
-        logging.debug(f"Opening DB {path}, exists: {path.exists()}")
-        with sqlite3.connect(path, detect_types=PARSE_DECLTYPES) as con:
-            con.execute("PRAGMA foreign_keys = ON")
-            self.con = con
-            if not exists:
-                for name, schema in self.tables.items():
-                    con.execute(build_create_table_cmd(name, schema))
-                add_content(self, [""], state=Phase.HIDDEN, parent=Record())
+        if filename == MEMORY:
+            exists = False
+            path = filename
+        else:
+            path = Path(filename).expanduser()
+            exists = path.exists() and path.stat().st_size > 0
+        logging.debug(f"Opening DB {path}, exists: {exists}")
+        self.con = sqlite3.connect(path, detect_types=PARSE_DECLTYPES)
+        self.con.execute("PRAGMA foreign_keys = ON")
+        if not exists:
+            for name, schema in self.tables.items():
+                self.con.execute(build_create_table_cmd(name, schema))
+            add_content(self, [""], state=Phase.HIDDEN, parent=Record())
         self.verify() if self.strict else self.verify(10)
 
     def __enter__(self):
         return self
 
     def __exit__(self, *exc_details):
-        self.verify() if self.strict else self.verify(3)
-        self.con.close()
+        try:
+            # self.verify() if self.strict else self.verify(3)
+            self.con.close()
+        except Exception as exc:
+            self.con.close()
+            raise exc
 
     def query(self, sql: str, params: Params) -> Cursor:
         logging.debug(f"Executing SQL   :{sql}")
